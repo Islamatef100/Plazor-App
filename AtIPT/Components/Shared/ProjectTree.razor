@@ -1,0 +1,28 @@
+﻿<ul class="tree">
+    @foreach (var node in Nodes)
+    {
+        <li>
+            <span class="tree-node"
+                  @onclick="() => Select(node)"
+                  @ondblclick="() => DoubleClick(node)"
+                  @oncontextmenu="e => RightClick(node, e.ClientX, e.ClientY)"
+                  @oncontextmenu:preventDefault="true">
+                @node.Name
+            </span>
+            @if (node.Children.Any())
+            {
+                <ProjectTree Nodes="node.Children"
+                             Select="Select"
+                             DoubleClick="DoubleClick"
+                             RightClick="RightClick" />
+            }
+        </li>
+    }
+</ul>
+
+@code {
+    [Parameter] public IReadOnlyList<ProjectNode> Nodes { get; set; } = Array.Empty<ProjectNode>();
+    [Parameter] public Func<ProjectNode, Task> Select { get; set; } = _ => Task.CompletedTask;
+    [Parameter] public Func<ProjectNode, Task> DoubleClick { get; set; } = _ => Task.CompletedTask;
+    [Parameter] public Func<ProjectNode, double, double, Task> RightClick { get; set; } = (_, _, _) => Task.CompletedTask;
+}

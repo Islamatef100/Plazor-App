@@ -1,0 +1,1342 @@
+/* ============================================================
+   Theme variables
+   ============================================================ */
+:root,
+.app-shell[data-theme="light"] {
+    --bg: #f5f6f8;
+    --surface: #ffffff;
+    --surface-2: #eef0f3;
+    --text: #1c1c1e;
+    --text-muted: #6b7280;
+    --border: #d7dbe0;
+    --accent: #0d6efd;
+    --accent-hover: #0b5ed7;
+    --danger: #dc3545;
+    --success: #198754;
+    --radius: 6px;
+    --shadow: 0 1px 3px rgba(0, 0, 0, .06), 0 1px 2px rgba(0, 0, 0, .04);
+    --shadow-lg: 0 12px 40px rgba(0, 0, 0, .28);
+    --ribbon-bg: #f0f1f3;
+    --ribbon-header: #0d6efd;
+    --ribbon-header-text: #ffffff;
+    --ribbon-btn-hover: #dbe8ff;
+    --sidebar-bg: #e9ebee;
+    --row-alt: rgba(0, 0, 0, .025);
+    --table-header-bg: #e4e7ec;
+    --table-header-text: #1c1c1e;
+}
+
+.app-shell[data-theme="dark"] {
+    --bg: #17181b;
+    --surface: #1f2126;
+    --surface-2: #26282e;
+    --text: #e6e8eb;
+    --text-muted: #9ba1a9;
+    --border: #34373d;
+    --accent: #4d8dff;
+    --accent-hover: #6b9fff;
+    --ribbon-bg: #26282e;
+    --ribbon-header: #0a4bb5;
+    --ribbon-header-text: #f0f2f5;
+    --ribbon-btn-hover: #2e4159;
+    --sidebar-bg: #1a1c20;
+    --row-alt: rgba(255, 255, 255, .035);
+    --table-header-bg: #2b2e35;
+    --table-header-text: #e6e8eb;
+}
+
+/* ============================================================
+   Reset / base
+   ============================================================ */
+* {
+    box-sizing: border-box;
+}
+
+html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+    font-size: 13px;
+    transition: background .15s ease, color .15s ease;
+}
+
+/* ============================================================
+   App shell
+   ============================================================ */
+.app-shell {
+    display: grid;
+    grid-template-rows: 34px auto 1fr;
+    height: 100vh;
+    width: 100vw;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+}
+
+/* ============================================================
+   Blue header
+   ============================================================ */
+.app-header {
+    background: var(--ribbon-header);
+    color: var(--ribbon-header-text);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 12px;
+    font-weight: 600;
+    font-size: 13px;
+    user-select: none;
+    position: relative;
+    z-index: 1500; /* sits above the loading overlay (z-index: 1000) */
+}
+    .app-header .brand {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+        .app-header .brand img {
+            height: 20px;
+        }
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.header-link {
+    background: transparent;
+    border: none;
+    color: var(--ribbon-header-text);
+    font-size: 12px;
+    cursor: pointer;
+    text-decoration: underline;
+    font-family: inherit;
+    padding: 2px 6px;
+}
+
+    .header-link:hover {
+        opacity: .8;
+    }
+
+.app-header .theme-toggle {
+    background: transparent;
+    border: 1px solid rgba(255,255,255,.35);
+    color: inherit;
+    border-radius: 999px;
+    padding: 3px 12px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+}
+
+    .app-header .theme-toggle:hover {
+        background: rgba(255,255,255,.15);
+    }
+
+/* ============================================================
+   Ribbon bar
+   ============================================================ */
+.ribbon {
+    background: var(--ribbon-bg);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: stretch;
+    min-height: 88px;
+    padding: 0 6px;
+    overflow-x: auto;
+    user-select: none;
+}
+
+.ribbon-group {
+    display: flex;
+    flex-direction: column;
+    min-width: max-content;
+    border-right: 1px solid var(--border);
+    padding: 4px 6px 0;
+}
+
+    .ribbon-group:last-child {
+        border-right: none;
+    }
+
+.ribbon-group-items {
+    display: flex;
+    align-items: flex-start;
+    gap: 2px;
+    flex: 1;
+}
+
+.ribbon-group-label {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-align: center;
+    padding: 2px 0 4px;
+}
+
+.ribbon-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 6px 8px 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 4px;
+    min-width: 62px;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 11px;
+    font-family: inherit;
+    line-height: 1.1;
+    transition: background .1s;
+}
+
+    .ribbon-btn:hover:not(:disabled) {
+        background: var(--ribbon-btn-hover);
+        border-color: var(--border);
+    }
+
+    .ribbon-btn:disabled {
+        opacity: .45;
+        cursor: not-allowed;
+    }
+
+.ribbon-icon {
+    width: 24px;
+    height: 24px;
+    stroke: var(--accent);
+    fill: none;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.ribbon-btn:disabled .ribbon-icon {
+    stroke: var(--text-muted);
+}
+
+.ribbon-btn span {
+    white-space: nowrap;
+}
+
+/* ============================================================
+   Body (sidebar + content)
+   ============================================================ */
+.body-area {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    grid-template-rows: 1fr;
+    min-height: 0;
+    overflow: hidden;
+    transition: grid-template-columns .15s ease;
+}
+
+    .body-area.collapsed {
+        grid-template-columns: 34px 1fr;
+    }
+
+.sidebar {
+    background: var(--sidebar-bg);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+}
+
+.sidebar-header {
+    padding: 8px;
+    font-weight: 700;
+    font-size: 11px;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 34px;
+}
+
+.sidebar-toggle {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: inherit;
+}
+
+    .sidebar-toggle:hover {
+        background: var(--surface-2);
+        color: var(--text);
+    }
+
+.sidebar-body {
+    overflow: auto;
+    padding: 6px 4px;
+    min-height: 0;
+    flex: 1;
+}
+
+/* ============================================================
+   Content area
+   ============================================================ */
+.content {
+    padding: 16px 20px 20px 20px;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-height: 0;
+}
+
+/* ============================================================
+   Welcome hero
+   ============================================================ */
+.welcome-hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 40px 16px 20px;
+}
+
+    .welcome-hero .hero-logo {
+        height: 96px;
+        margin-bottom: 20px;
+        object-fit: contain;
+    }
+
+    .welcome-hero .hero-icon-svg {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 20px;
+    }
+
+    .welcome-hero h2 {
+        font-size: 26px;
+        margin: 0 0 8px;
+        font-weight: 700;
+    }
+
+    .welcome-hero p {
+        margin: 0;
+        color: var(--text-muted);
+        font-size: 14px;
+    }
+
+/* ============================================================
+   Quick start card
+   ============================================================ */
+.quick-start {
+    max-width: 780px;
+    margin: 0 auto 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 18px 24px;
+}
+
+    .quick-start h3 {
+        margin: 0 0 16px;
+        font-size: 15px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .quick-start .step {
+        display: flex;
+        align-items: flex-start;
+        gap: 14px;
+        padding: 8px 0;
+    }
+
+    .quick-start .step-num {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 13px;
+        color: #fff;
+        flex-shrink: 0;
+    }
+
+.step-num.blue {
+    background: #1976d2;
+}
+
+.step-num.green {
+    background: #2e7d32;
+}
+
+.step-num.red {
+    background: #c62828;
+}
+
+.quick-start .step-body strong {
+    display: block;
+    font-size: 13px;
+    margin-bottom: 2px;
+}
+
+.quick-start .step-body span {
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+/* ============================================================
+   Page primitives
+   ============================================================ */
+.page-header h1 {
+    margin: 0 0 4px;
+    font-size: 18px;
+}
+
+.page-header p {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: 12px;
+}
+
+.card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    flex-shrink: 0;
+}
+
+.card-header {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+    font-size: 13px;
+    flex: 0 0 auto;
+}
+
+.card-body {
+    padding: 12px 14px;
+}
+
+.cards-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+}
+
+/* ============================================================
+   Grid (generic tables)
+   ============================================================ */
+.grid-wrap {
+    overflow: auto;
+    max-height: 100%;
+}
+
+table.grid {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+    table.grid th,
+    table.grid td {
+        padding: 5px 9px;
+        border-bottom: 1px solid var(--border);
+        text-align: left;
+        white-space: nowrap;
+    }
+
+    table.grid thead th {
+        position: sticky;
+        top: 0;
+        background: var(--surface-2);
+        z-index: 1;
+        font-weight: 600;
+    }
+
+/* ============================================================
+   Controls
+   ============================================================ */
+.toolbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 0;
+}
+
+.muted {
+    color: var(--text-muted);
+}
+
+.input {
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 5px 9px;
+    min-width: 140px;
+    font-family: inherit;
+    font-size: 12px;
+}
+
+button.btn {
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 6px 12px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+    transition: background .1s, border-color .1s, color .1s;
+}
+
+    button.btn:hover:not(:disabled) {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+    }
+
+    button.btn.primary {
+        background: var(--accent);
+        color: #fff;
+        border-color: var(--accent);
+    }
+
+        button.btn.primary:hover:not(:disabled) {
+            background: var(--accent-hover);
+        }
+
+    button.btn:disabled {
+        opacity: .5;
+        cursor: not-allowed;
+    }
+
+/* ============================================================
+   Action row — Cancel left, actions right, pinned to the
+   bottom of its containing flex-column page (via margin-top: auto
+   applied below on the page wrappers).
+   ============================================================ */
+.action-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 0 18px 0;
+    border-top: 1px solid var(--border);
+    flex: 0 0 auto;
+}
+
+.action-left,
+.action-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.action-row button.btn {
+    min-width: 110px;
+    padding: 8px 18px;
+    font-size: 13px;
+}
+
+/* ============================================================
+   Tabs
+   ============================================================ */
+.tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+}
+
+.tab {
+    background: var(--surface-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-bottom: none;
+    border-radius: var(--radius) var(--radius) 0 0;
+    padding: 6px 14px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+}
+
+    .tab.active {
+        background: var(--surface);
+        font-weight: 600;
+    }
+
+/* ============================================================
+   Columns grid (Import)
+   ============================================================ */
+.cols-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 4px;
+}
+
+.chk {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 0;
+    font-size: 12px;
+}
+
+/* ============================================================
+   Unit System — disabled radios, matches old project exactly.
+   ============================================================ */
+.unit-system {
+    display: flex;
+    gap: 24px;
+    align-items: center;
+    padding: 4px 0;
+}
+
+    .unit-system .radio-line {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 13px;
+        color: var(--text);
+        cursor: default;
+    }
+
+        .unit-system .radio-line input[type="radio"] {
+            width: 16px;
+            height: 16px;
+            cursor: not-allowed;
+            accent-color: var(--accent);
+            opacity: 0.85;
+        }
+
+            .unit-system .radio-line input[type="radio"]:disabled + span {
+                color: var(--text-muted);
+            }
+
+            .unit-system .radio-line input[type="radio"]:checked + span {
+                color: var(--text);
+                font-weight: 600;
+            }
+
+/* ============================================================
+   Error banner
+   ============================================================ */
+.error {
+    background: #fde8e8;
+    color: var(--danger);
+    border: 1px solid var(--danger);
+    border-radius: var(--radius);
+    padding: 8px 12px;
+    white-space: pre-line;
+    font-size: 12px;
+}
+
+.app-shell[data-theme="dark"] .error {
+    background: #3a1e1e;
+}
+
+/* ============================================================
+   Overlay / dialog / spinner
+   ============================================================ */
+.overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.overlay-panel {
+    position: relative;
+    z-index: 1001;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px 26px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    box-shadow: var(--shadow-lg);
+}
+
+.dialog {
+    flex-direction: column;
+    align-items: stretch;
+    min-width: 380px;
+    max-width: 480px;
+    gap: 0;
+}
+
+.dialog-title {
+    font-weight: 700;
+    font-size: 15px;
+    margin-bottom: 12px;
+}
+
+.dialog-body {
+    margin-bottom: 12px;
+}
+
+.dialog-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    margin-top: 12px;
+}
+
+.spinner {
+    width: 22px;
+    height: 22px;
+    border: 3px solid var(--surface-2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* ============================================================
+   Loading overlay (ADVANTEK branded)
+   ============================================================ */
+.loading-panel {
+    background: var(--surface);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 32px 48px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    box-shadow: var(--shadow-lg);
+    min-width: 340px;
+}
+
+.loading-logo {
+    height: 72px;
+    width: 72px;
+    object-fit: contain;
+}
+
+.loading-brand {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: var(--accent);
+}
+
+.loading-sub {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: -6px;
+    margin-bottom: 6px;
+}
+
+.loading-message {
+    font-size: 13px;
+    color: var(--text);
+    text-align: center;
+    margin-top: 6px;
+}
+
+.loading-panel .spinner {
+    width: 28px;
+    height: 28px;
+    border: 3px solid var(--surface-2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+/* ============================================================
+   Simple chart
+   ============================================================ */
+.chart {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 0;
+}
+
+    .chart svg {
+        width: 100%;
+        max-width: 900px;
+        height: 300px;
+        background: var(--surface-2);
+        border-radius: var(--radius);
+    }
+
+.chart-axis-x {
+    margin-top: 6px;
+    font-weight: 600;
+    font-size: 12px;
+}
+
+.chart-axis-y {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    align-self: flex-start;
+    margin-right: -20px;
+    font-size: 12px;
+}
+
+/* ============================================================
+   Interactive chart
+   ============================================================ */
+.interactive-chart {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 6px 0;
+}
+
+.chart-toolbar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+    .chart-toolbar .pick-hint {
+        color: var(--text-muted);
+        font-size: 12px;
+        font-style: italic;
+    }
+
+.chart-container {
+    position: relative;
+    background: var(--surface-2);
+    border-radius: var(--radius);
+    overflow: hidden;
+}
+
+    .chart-container svg {
+        display: block;
+        width: 100%;
+        height: 320px;
+        cursor: crosshair;
+    }
+
+.chart-tooltip {
+    position: absolute;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 11px;
+    pointer-events: none;
+    transform: translate(12px, -12px);
+    white-space: nowrap;
+    box-shadow: var(--shadow);
+}
+
+.series-toggles {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 4px 12px;
+    padding-top: 6px;
+}
+
+/* ============================================================
+   Tree (project explorer)
+   ============================================================ */
+.tree {
+    list-style: none;
+    padding-left: 10px;
+    margin: 0;
+}
+
+    .tree li {
+        padding: 1px 0;
+        font-size: 12px;
+    }
+
+.tree-node {
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 3px;
+    display: inline-block;
+}
+
+    .tree-node:hover {
+        background: var(--surface-2);
+    }
+
+/* ============================================================
+   Context menu
+   ============================================================ */
+.context-menu {
+    position: fixed;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    box-shadow: var(--shadow-lg);
+    padding: 4px 0;
+    min-width: 130px;
+    z-index: 2000;
+    font-size: 12px;
+}
+
+.context-menu-item {
+    padding: 6px 14px;
+    cursor: pointer;
+    user-select: none;
+}
+
+    .context-menu-item:hover {
+        background: var(--accent);
+        color: #fff;
+    }
+
+/* ============================================================
+   Solutions view
+   ============================================================ */
+.solutions-layout {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    gap: 14px;
+    flex: 1;
+    min-height: 0;
+}
+
+.solutions-list {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.solutions-list-header {
+    padding: 10px 14px;
+    font-weight: 700;
+    font-size: 12px;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--text-muted);
+}
+
+.solution-item {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    font-size: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+    .solution-item:hover {
+        background: var(--surface-2);
+    }
+
+    .solution-item.active {
+        background: var(--accent);
+        color: #fff;
+    }
+
+        .solution-item.active .muted {
+            color: rgba(255,255,255,.8);
+        }
+
+.solutions-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-height: 0;
+    overflow: auto;
+}
+
+/* ============================================================
+   Import page — pinned header + Columns/Preview grid +
+   action row at the bottom of the page.
+   ============================================================ */
+.import-page {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    height: 100%;
+}
+
+.import-layout {
+    display: grid;
+    grid-template-columns: 260px 56px 1fr;
+    grid-template-rows: 1fr;
+    gap: 12px;
+    flex: 1 1 auto;
+    min-height: 0;
+    min-width: 0;
+}
+
+.import-columns {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+    min-width: 0;
+}
+
+.import-columns-header {
+    padding: 10px 14px;
+    font-weight: 700;
+    font-size: 11px;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--text-muted);
+    background: var(--surface-2);
+    flex: 0 0 auto;
+}
+
+.import-columns-body {
+    overflow: auto;
+    padding: 6px 6px;
+    flex: 1 1 auto;
+    min-height: 0;
+}
+
+    .import-columns-body .chk {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 5px 8px;
+        font-size: 12px;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+
+        .import-columns-body .chk:hover {
+            background: var(--surface-2);
+        }
+
+.import-extract {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+    .import-extract button {
+        width: 44px;
+        height: 44px;
+        font-size: 18px;
+        font-weight: 700;
+        padding: 0;
+        border-radius: 50%;
+    }
+
+.import-preview {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+    min-width: 0;
+}
+
+.import-preview-header {
+    padding: 10px 14px;
+    font-weight: 700;
+    font-size: 11px;
+    border-bottom: 1px solid var(--border);
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--text-muted);
+    background: var(--surface-2);
+    flex: 0 0 auto;
+}
+
+.import-preview-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: auto;
+    background: var(--surface);
+}
+
+/* ============================================================
+   Pagination footer
+   ============================================================ */
+.pagination {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 14px 16px 18px 16px;
+    border-top: 1px solid var(--border);
+    background: var(--surface-2);
+    font-size: 12px;
+    width: 100%;
+}
+
+.pagination-info {
+    color: var(--text);
+    font-weight: 600;
+    text-align: center;
+    width: 100%;
+    letter-spacing: .02em;
+}
+
+    .pagination-info .muted {
+        font-weight: 400;
+        margin-left: 6px;
+    }
+
+.pagination-controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+    .pagination-controls .btn {
+        padding: 5px 12px;
+        font-size: 12px;
+        min-width: 36px;
+        border-radius: 4px;
+        line-height: 1.2;
+    }
+
+        .pagination-controls .btn.primary {
+            font-weight: 700;
+        }
+
+.pagination-ellipsis {
+    padding: 4px 6px;
+    color: var(--text-muted);
+    user-select: none;
+    font-weight: 600;
+}
+
+/* ============================================================
+   Professional data grid
+   ============================================================ */
+table.data-grid {
+    border-collapse: separate;
+    border-spacing: 0;
+    width: 100%;
+    font-size: 12px;
+    background: var(--surface);
+}
+
+    table.data-grid thead th {
+        position: sticky;
+        top: 0;
+        background: var(--table-header-bg);
+        color: var(--table-header-text);
+        font-weight: 700;
+        padding: 10px 14px;
+        text-align: left;
+        border-bottom: 2px solid var(--border);
+        white-space: nowrap;
+        z-index: 2;
+        font-family: "Segoe UI", system-ui, sans-serif;
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+    }
+
+    table.data-grid tbody tr {
+        transition: background .1s;
+    }
+
+        table.data-grid tbody tr:nth-child(even) {
+            background: var(--row-alt);
+        }
+
+        table.data-grid tbody tr:hover {
+            background: var(--ribbon-btn-hover);
+        }
+
+    table.data-grid tbody td {
+        padding: 7px 14px;
+        border-bottom: 1px solid var(--border);
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+        font-family: "Consolas", "Segoe UI", monospace;
+        color: var(--text);
+        font-size: 12px;
+    }
+
+    table.data-grid .row-number-col {
+        width: 64px;
+        text-align: right;
+        color: var(--text-muted);
+        font-family: "Segoe UI", system-ui, sans-serif;
+        background: var(--surface-2);
+        font-weight: 600;
+        user-select: none;
+        position: sticky;
+        left: 0;
+        z-index: 1;
+        font-variant-numeric: tabular-nums;
+    }
+
+    table.data-grid thead .row-number-col {
+        z-index: 3;
+        background: var(--table-header-bg);
+    }
+
+    table.data-grid thead th:not(.row-number-col) {
+        min-width: 140px;
+    }
+
+/* ============================================================
+   Model Parameters page — flex column, action row at bottom.
+   ============================================================ */
+.params-page {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+    min-height: 0;
+    padding-bottom: 0;
+}
+
+    /* Push the action row of Import and Model Parameters to the bottom
+   of the flex column so it sits under the page, not the content. */
+    .import-page > .action-row,
+    .params-page > .action-row {
+        margin-top: auto;
+        padding-top: 14px;
+        padding-bottom: 6px;
+    }
+
+/* ============================================================
+   Parameter grid — extra breathing room
+   ============================================================ */
+table.params-grid th,
+table.params-grid td {
+    padding: 8px 10px;
+}
+
+    table.params-grid td input.input {
+        min-width: 120px;
+        width: 100%;
+    }
+
+/* ============================================================
+   Interactive chart — axis titles layout
+   ============================================================ */
+.chart-body {
+    display: grid;
+    grid-template-columns: 32px 1fr;
+    gap: 4px;
+    align-items: stretch;
+}
+
+.chart-y-title {
+    writing-mode: vertical-rl;
+    transform: rotate(180deg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 12px;
+    color: var(--text);
+    text-align: center;
+    user-select: none;
+}
+
+.chart-svg-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.chart-x-title {
+    text-align: center;
+    font-weight: 700;
+    font-size: 12px;
+    color: var(--text);
+    padding: 4px 0 2px 0;
+    user-select: none;
+}
+
+/* ============================================================
+   Page wrappers — action row pinned at the bottom of the page
+   even when content is short.
+   ============================================================ */
+.content > .import-page,
+.content > .params-page {
+    flex: 1 1 auto;
+    min-height: 0;
+}
+.chart-main-title {
+    text-align: center;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 6px 0 4px 0;
+    color: var(--text);
+}
+/* ============================================================
+   Chart legend — colour swatch + series name
+   ============================================================ */
+.chart-legend {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 24px;
+    padding: 8px 0 4px 0;
+    flex-wrap: wrap;
+    font-size: 12px;
+    user-select: none;
+}
+
+.legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--text);
+}
+
+.legend-swatch {
+    display: inline-block;
+    width: 14px;
+    height: 10px;
+    border-radius: 2px;
+    border: 1px solid rgba(0,0,0,.15);
+}

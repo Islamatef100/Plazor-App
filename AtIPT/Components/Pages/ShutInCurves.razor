@@ -1,0 +1,125 @@
+﻿@page "/shut-in-curves"
+@inject AppState State
+@inject NavigationManager Nav
+@using AtIPT.Components.Shared
+
+<PageTitle>Shut-in Curves</PageTitle>
+
+<PageHeader Title="Shut-in Curves"
+            Subtitle="Pressure and derivative in the analysis window. Click on the chart to pick points." />
+
+@if (State.ActivePickTarget != PickTarget.None)
+{
+    <div class="card" style="padding:8px 14px; display:flex; align-items:center; gap:12px;">
+        <span class="pick-hint">Picking: <strong>@State.ActivePickTarget</strong> — click on the chart.</span>
+        <button class="btn" @onclick="() => CancelPick()">Cancel Pick</button>
+    </div>
+}
+
+<AppCard>
+    @if (State.Case.DifferenceVariables.Count >= 3 && State.Case.DifferenceVariables[0].Values.Count > 1)
+    {
+        <InteractiveChart Series="BuildSeries()"
+                          XTitle="Shut-in Time (hr)"
+                          YTitle="Differential Pressure and Derivative (psi)"
+                          LogX="true"
+                          LogY="true"
+                          PickMode="@(State.ActivePickTarget != PickTarget.None)"
+                          Picked="OnPicked" />
+    }
+    else
+    {
+        <p class="muted">Open Model Parameters and click Done to compute the derivative.</p>
+    }
+</AppCard>
+
+<div class="toolbar">
+    <button class="btn" @onclick="() => BeginPick(PickTarget.FscFirstPoint)">Pick FSC Point</button>
+    <button class="btn" @onclick="() => BeginPick(PickTarget.PermeabilityPoint)">Pick Permeability Point</button>
+    <button class="btn" @onclick="() => BeginPick(PickTarget.MobilityPoint)">Pick Mobility Ratio Point</button>
+</div>
+
+@code {
+    private IReadOnlyList<ChartSeries> BuildSeries()
+    {
+        var d = State.Case.DifferenceVariables;
+        return new[]
+        {
+            new ChartSeries
+            {
+                Name = "Pressure",
+                Color = "#dc3545",
+                X = d[0].Values,
+                Y = d[1].Values,
+                Visible = true
+            },
+            new ChartSeries
+            {
+                Name = "Derivative",
+                Color = "#000000",
+                X = d[0].Values,
+                Y = d[2].Values,
+                Visible = true,
+                PointMarkers = true
+            }
+        };
+    }
+
+    private Task CancelPick()
+    {
+        State.CancelPick();
+        return Task.CompletedTask;
+    }
+
+    private Task BeginPick(PickTarget target)
+    {
+        State.BeginPick(target);
+        return Task.CompletedTask;
+    }
+
+    private Task OnPicked(double x, double y)
+    {
+        State.PickedPoints.Add((x, y));
+
+        switch (State.ActivePickTarget)
+        {
+            case PickTarget.FscFirstPoint:
+                if (State.PickedPoints.Count >= 2)
+                {
+                    var p1 = State.PickedPoints[0];
+                    var p2 = State.PickedPoints[1];
+                    double slope = (p2.Y - p1.Y) / (p2.X - p1.X);
+                    double rate = State.Case.Parameters[7].Value;
+                    if (slope != 0)
+                        State.Case.Parameters[21].Value = Math.Round(rate / (24 * slope), 6);
+                    State.CancelPick();
+                }
+                break;
+
+            case PickTarget.PermeabilityPoint:
+                {
+                    double rate = State.Case.Parameters[7].Value;
+                    double visc = State.Case.Parameters[6].Value;
+                    double thick = State.Case.Parameters[9].Value;
+                    if (y != 0)
+                    {
+                        double val = (70.6 * rate * visc) / (thick * y);
+                        State.Case.Parameters[18].Value = Math.Round(val, 6);
+                    }
+                    State.CancelPick();
+                }
+                break;
+
+            case PickTarget.MobilityPoint:
+                State.Case.Parameters[19].Value = Math.Round(y, 6);
+                State.Case.Parameters[20].Value = Math.Round(y, 6);
+                State.CancelPick();
+                break;
+
+            default:
+                State.CancelPick();
+                break;
+        }
+        return Task.CompletedTask;
+    }
+}

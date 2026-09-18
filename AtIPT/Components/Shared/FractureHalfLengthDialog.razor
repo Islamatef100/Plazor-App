@@ -1,0 +1,77 @@
+﻿@if (Visible)
+{
+    <div class="overlay">
+        <div class="overlay-panel dialog">
+            <div class="dialog-title">Fracture Half Length</div>
+
+            <div class="dialog-body">
+                <div class="row">
+                    <label class="chk">
+                        <input type="radio" name="fhlt" checked="@(_mode == 0)"
+                               @onchange="() => _mode = 0" />
+                        Fracture Half Length (KGD)
+                    </label>
+                </div>
+                <div class="row">
+                    <input class="input" readonly value="@_kgdText" style="width:140px;" />
+                </div>
+
+                <div class="row" style="margin-top:12px;">
+                    <label class="chk">
+                        <input type="radio" name="fhlt" checked="@(_mode == 1)"
+                               @onchange="() => _mode = 1" />
+                        Fracture Half Length (PKN)
+                    </label>
+                </div>
+                <div class="row">
+                    <input class="input" readonly value="@_pknText" style="width:140px;" />
+                </div>
+            </div>
+
+            <div class="dialog-actions">
+                <button class="btn" @onclick="() => Cancel()">Cancel</button>
+                <button class="btn primary" @onclick="() => Done()">Done</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public double Fsc { get; set; }           // Fracture Storage Constant
+    [Parameter] public double PoissonRatio { get; set; }
+    [Parameter] public double YoungModulus { get; set; }
+    [Parameter] public double Thickness { get; set; }
+    [Parameter] public Func<double, Task> Picked { get; set; } = _ => Task.CompletedTask;
+    [Parameter] public Func<Task> Cancel { get; set; } = () => Task.CompletedTask;
+
+    private int _mode = 0;
+    private string _kgdText = "";
+    private string _pknText = "";
+
+    protected override void OnParametersSet()
+    {
+        if (!Visible) return;
+
+        // Port of FractureHalfLength.kgd_CheckedChanged.
+        double k = 2 * Math.PI * (1 - Math.Pow(PoissonRatio, 2)) * Thickness / YoungModulus;
+        double c = Fsc / k;
+        double l = Math.Sqrt(c) * Math.Sqrt(5.615);
+        _kgdText = l.ToString("F3");
+
+        // Port of FractureHalfLength.pkn_CheckedChanged.
+        double cpkn = Math.PI * (1 - Math.Pow(PoissonRatio, 2)) * Math.Pow(Thickness, 2) / YoungModulus;
+        double val = (Fsc / cpkn) * 5.615;
+        _pknText = val.ToString("F3");
+    }
+
+    private Task Done()
+    {
+        double v = _mode == 0 ? Parse(_kgdText) : Parse(_pknText);
+        return Picked(v);
+    }
+
+    private static double Parse(string s)
+        => double.TryParse(s, System.Globalization.NumberStyles.Any,
+            System.Globalization.CultureInfo.InvariantCulture, out var d) ? d : 0;
+}

@@ -1,0 +1,55 @@
+﻿@if (Visible)
+{
+    <div class="overlay">
+        <div class="overlay-panel dialog">
+            <div class="dialog-title">Termination Criteria</div>
+
+            <div class="dialog-body">
+                <div style="margin-bottom:12px; font-weight:600;">Terminate When :</div>
+
+                <label style="display:block; margin-bottom:8px;">
+                    <input type="radio"
+                           name="term"
+                           checked="@(_mode == 0)"
+                           @onchange="() => _mode = 0" />
+                    &nbsp;Residual Matching Error is less than
+                </label>
+
+                <input class="input"
+                       type="number"
+                       step="any"
+                       disabled="@(_mode != 0)"
+                       @bind="_errorValue"
+                       style="margin-left:24px; width:130px;" />
+
+                <label style="display:block; margin-top:12px;">
+                    <input type="radio"
+                           name="term"
+                           checked="@(_mode == 1)"
+                           @onchange="() => _mode = 1" />
+                    &nbsp;Absolute Best Model Match is reached
+                </label>
+            </div>
+
+            <div class="dialog-actions">
+                <button class="btn" @onclick="() => Cancel()">Cancel</button>
+                <button class="btn primary" @onclick="() => OkClick()">OK</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public Func<double?, Task> Confirm { get; set; } = _ => Task.CompletedTask;
+    [Parameter] public Func<Task> Cancel { get; set; } = () => Task.CompletedTask;
+
+    private int _mode = 1;
+    private double _errorValue = 0.05;
+
+    private Task OkClick()
+    {
+        double? target = _mode == 0 ? _errorValue : null;
+        return Confirm(target);
+    }
+}

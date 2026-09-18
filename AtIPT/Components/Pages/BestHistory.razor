@@ -1,0 +1,143 @@
+﻿@page "/best-history"
+@inject AppState State
+@inject ISolverFileService Files
+@inject IExcelExportService Excel
+@inject IJSRuntime JS
+@using AtIPT.Infrastructure.Simulation
+
+<PageTitle>Best History</PageTitle>
+
+<PageHeader Title="Best History"
+            Subtitle="Tabulated log of all parameter sets from the last run." />
+
+@if (_rows.Count == 0)
+{
+    <AppCard Title="History">
+        <p class="muted">No history yet.</p>
+    </AppCard>
+}
+else
+{
+    <AppCard Title="@($"{_rows.Count} solution(s)")">
+        <div class="grid-wrap">
+            <table class="grid">
+                <thead>
+                    <tr>
+                        <th>Solution #</th>
+                        <th>Residual Error</th>
+                        <th>Inner Zone Permeability (mD)</th>
+                        <th>Fracture Half Length (ft)</th>
+                        <th>Fracture Storage Constant (bbls/psi)</th>
+                        <th>Fracture Skin</th>
+                        <th>Dimensionless Fracture Conductivity</th>
+                        <th>Injection Layer Stress (psi)</th>
+                        <th>Containment Layer Stress (psi)</th>
+                        <th>Length Shrinkage Speed Parameter (Delpat)</th>
+                        <th>Mobility Front, Elliptical</th>
+                        <th>Mobility / Diffusivity Ratio</th>
+                        <th>Outer Zone Permeability (mD)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (int i = 0; i < _rows.Count; i++)
+                    {
+                        var row = _rows[i];
+                        <tr>
+                            <td>@(i + 1)</td>
+                            @foreach (var cell in row)
+                            {
+                                <td>@cell</td>
+                            }
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    </AppCard>
+
+    @if (_configuration.Count >= 3)
+    {
+        <AppCard Title="Configurations">
+            <div class="row"><label>Model Type</label><span class="muted">@_configuration[0]</span></div>
+            <div class="row"><label>Shrinkage Type</label><span class="muted">@_configuration[1]</span></div>
+            <div class="row"><label>Fracture Type</label><span class="muted">@_configuration[2]</span></div>
+        </AppCard>
+    }
+}
+
+<div class="toolbar">
+    <button class="btn primary" disabled="@(_rows.Count == 0)" @onclick="() => ExportAsync()">
+        Export History File
+    </button>
+    <button class="btn" @onclick="() => ReloadAsync()">Reload</button>
+</div>
+
+@code {
+    private List<List<string>> _rows = new();
+    private List<string> _configuration = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        await ReloadAsync();
+    }
+
+    private Task ReloadAsync()
+    {
+        var folder = Files.ExeFolder;
+        _rows          = BestHistoryParser.ReadBestHistory(folder);
+        _configuration = BestHistoryParser.ReadBestHistoryConfiguration(folder);
+        return Task.CompletedTask;
+    }
+
+    private async Task ExportAsync()
+    {
+        var sheet = new List<IReadOnlyList<string>>
+        {
+            new[]
+            {
+                "Solution #",
+                "Residual Error",
+                "Inner Zone Permeability (mD)",
+                "Fracture Half Length (ft)",
+                "Fracture Storage Constant (bbls/psi)",
+                "Fracture Skin",
+                "Dimensionless Fracture Conductivity",
+                "Injection Layer Stress (psi)",
+                "Containment Layer Stress (psi)",
+                "Length Shrinkage Speed Parameter (Delpat)",
+                "Mobility Front, Elliptical",
+                "Mobility / Diffusivity Ratio",
+                "Outer Zone Permeability (mD)"
+            }
+        };
+
+        for (int i = 0; i < _rows.Count; i++)
+        {
+            var row = new List<string> { (i + 1).ToString() };
+            row.AddRange(_rows[i]);
+            sheet.Add(row);
+        }
+
+        var sheets = new Dictionary<string, IReadOnlyList<IReadOnlyList<string>>>
+        {
+            ["History"] = sheet
+        };
+
+        if (_configuration.Count >= 3)
+        {
+            sheets["Configuration"] = new List<IReadOnlyList<string>>
+            {
+                new[] { "Model Type",     _configuration[0] },
+                new[] { "Shrinkage Type", _configuration[1] },
+                new[] { "Fracture Type",  _configuration[2] }
+            };
+        }
+
+        var bytes = Excel.CreateWorkbook(sheets);
+
+        await JS.InvokeVoidAsync("atipt.downloadFile",
+            "BestHistory.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            bytes);
+    }
+}

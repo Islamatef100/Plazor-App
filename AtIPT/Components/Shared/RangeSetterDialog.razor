@@ -1,0 +1,90 @@
+﻿@if (Visible)
+{
+    <div class="overlay">
+        <div class="overlay-panel dialog">
+            <div class="dialog-title">Axis Range Selection</div>
+
+            <div class="dialog-body">
+                <div class="row">
+                    <label style="width:100px;">X Axis Min</label>
+                    <input class="input" type="number" step="any"
+                           value="@_xMin"
+                           @oninput="OnXMinChanged" />
+                </div>
+                <div class="row">
+                    <label style="width:100px;">X Axis Max</label>
+                    <input class="input" type="number" step="any"
+                           value="@_xMax"
+                           @oninput="OnXMaxChanged" />
+                </div>
+                <div class="row">
+                    <label style="width:100px;">Y Axis Min</label>
+                    <input class="input" type="number" step="any"
+                           value="@_yMin"
+                           @oninput="OnYMinChanged" />
+                </div>
+                <div class="row">
+                    <label style="width:100px;">Y Axis Max</label>
+                    <input class="input" type="number" step="any"
+                           value="@_yMax"
+                           @oninput="OnYMaxChanged" />
+                </div>
+            </div>
+
+            <div class="dialog-actions">
+                <button class="btn" @onclick="() => CancelClick()">Cancel</button>
+                <button class="btn primary" @onclick="() => ApplyClick()">Set Axis</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public double XMin { get; set; }
+    [Parameter] public double XMax { get; set; }
+    [Parameter] public double YMin { get; set; }
+    [Parameter] public double YMax { get; set; }
+
+    [Parameter] public Func<AxisRange, Task> Apply  { get; set; } = _ => Task.CompletedTask;
+    [Parameter] public Func<Task>           Cancel { get; set; } = () => Task.CompletedTask;
+
+    private double _xMin;
+    private double _xMax;
+    private double _yMin;
+    private double _yMax;
+
+    protected override void OnParametersSet()
+    {
+        _xMin = XMin;
+        _xMax = XMax;
+        _yMin = YMin;
+        _yMax = YMax;
+    }
+
+    private static double Parse(ChangeEventArgs e)
+    {
+        var s = e.Value?.ToString();
+        if (string.IsNullOrEmpty(s)) return 0;
+
+        return double.TryParse(s,
+            System.Globalization.NumberStyles.Any,
+            System.Globalization.CultureInfo.InvariantCulture,
+            out var d) ? d : 0;
+    }
+
+    private void OnXMinChanged(ChangeEventArgs e) => _xMin = Parse(e);
+    private void OnXMaxChanged(ChangeEventArgs e) => _xMax = Parse(e);
+    private void OnYMinChanged(ChangeEventArgs e) => _yMin = Parse(e);
+    private void OnYMaxChanged(ChangeEventArgs e) => _yMax = Parse(e);
+
+    private Task ApplyClick() => Apply(new AxisRange
+    {
+        XMin = _xMin,
+        XMax = _xMax,
+        YMin = _yMin,
+        YMax = _yMax
+    });
+
+    private Task CancelClick() => Cancel();
+}

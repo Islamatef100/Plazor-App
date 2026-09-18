@@ -1,0 +1,357 @@
+﻿@page "/import"
+@inject IImportService Import
+@inject AppState State
+@inject NavigationManager Nav
+
+<PageTitle>Import Data</PageTitle>
+
+<div class="import-page">
+
+    <PageHeader Title="Import Data"
+                Subtitle="Select a text file, choose the columns to load, then continue to Select Input." />
+
+    <AppCard Title="Selected File">
+        <div class="row">
+            <InputFile OnChange="OnFileSelected" accept=".txt,.csv,.las" />
+            @if (!string.IsNullOrEmpty(State.SelectedFileName))
+            {
+                <span class="muted">@State.SelectedFileName</span>
+            }
+        </div>
+        @if (!string.IsNullOrEmpty(_status))
+        {
+            <div class="muted" style="margin-top:6px;">@_status</div>
+        }
+    </AppCard>
+
+    <div class="import-layout">
+
+        <aside class="import-columns">
+            <div class="import-columns-header">Columns</div>
+            <div class="import-columns-body">
+                @if (_columns.Count == 0)
+                {
+                    <p class="muted" style="padding:8px;">No file selected.</p>
+                }
+                else
+                {
+                    @foreach (var col in _columns)
+                    {
+                        <label class="chk">
+                            <input type="checkbox"
+                                   checked="@_selected.Contains(col.Name)"
+                                   @onchange="e => Toggle(col.Name, e)" />
+                            <span>@col.Name</span>
+                            <span class="muted" style="margin-left:auto; font-size:11px;">
+                                (@col.Values.Count)
+                            </span>
+                        </label>
+                    }
+                }
+            </div>
+        </aside>
+
+        <div class="import-extract">
+            <button class="btn primary"
+                    title="Extract selected columns"
+                    disabled="@(_columns.Count == 0)"
+                    @onclick="() => Extract()">
+                &gt;&gt;
+            </button>
+        </div>
+
+        <section class="import-preview">
+            <div class="import-preview-header">
+                Preview
+                @if (_allRows.Count > 0)
+                {
+                    <span class="muted">
+                        — @_allRows.Count row(s), @_previewColumns.Count column(s)
+                    </span>
+                }
+            </div>
+
+            <div class="import-preview-body">
+                @if (_allRows.Count == 0)
+                {
+                    <p class="muted" style="padding:12px;">
+                        Click <strong>&gt;&gt;</strong> to extract the selected columns.
+                    </p>
+                }
+                else
+                {
+                    <table class="grid data-grid">
+                        <thead>
+                            <tr>
+                                <th class="row-number-col">#</th>
+                                @foreach (var c in _previewColumns)
+                                {
+                                    <th>@c</th>
+                                }
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @{
+                                int i = 0;
+                                foreach (var row in PageRows())
+                                {
+                                    var rowNum = (_currentPage - 1) * PageSize + i + 1;
+                                    i++;
+                                    <tr>
+                                        <td class="row-number-col">@rowNum</td>
+                                        @foreach (var cell in row)
+                                        {
+                                            <td>@cell</td>
+                                        }
+                                    </tr>
+                                }
+                            }
+                        </tbody>
+                    </table>
+                }
+            </div>
+
+            @if (_allRows.Count > 0)
+            {
+                <div class="pagination">
+                    <div class="pagination-info">
+                        Page @_currentPage of @TotalPages
+                        <span class="muted">— @_allRows.Count rows</span>
+                    </div>
+                    <div class="pagination-controls">
+                        <button class="btn" disabled="@(_currentPage <= 1)"
+                                @onclick="() => GoToPage(1)">
+                            « First
+                        </button>
+                        <button class="btn" disabled="@(_currentPage <= 1)"
+                                @onclick="() => GoToPage(_currentPage - 1)">
+                            ‹ Prev
+                        </button>
+
+                        @foreach (var p in VisiblePages())
+                        {
+                            if (p == -1)
+                            {
+                                <span class="pagination-ellipsis">…</span>
+                            }
+                            else
+                            {
+                                var pg = p;
+                                <button class="btn @(_currentPage == pg ? "primary" : "")"
+                                        @onclick="() => GoToPage(pg)">
+                                    @pg
+                                </button>
+                            }
+                        }
+
+                        <button class="btn" disabled="@(_currentPage >= TotalPages)"
+                                @onclick="() => GoToPage(_currentPage + 1)">
+                            Next ›
+                        </button>
+                        <button class="btn" disabled="@(_currentPage >= TotalPages)"
+                                @onclick="() => GoToPage(TotalPages)">
+                            Last »
+                        </button>
+                    </div>
+                </div>
+            }
+        </section>
+
+    </div>
+
+    <div class="action-row">
+        <div class="action-left">
+            <button class="btn" @onclick="() => Cancel()">Cancel</button>
+        </div>
+        <div class="action-right">
+            <button class="btn primary"
+                    disabled="@(_allRows.Count == 0)"
+                    @onclick="() => ImportAsync()">
+                Import
+            </button>
+        </div>
+    </div>
+
+</div>
+
+@code {
+    private const int PageSize = 20;
+
+    private List<Variable> _columns = new();
+    private readonly HashSet<string> _selected = new(StringComparer.Ordinal);
+    private List<string> _previewColumns = new();
+    private List<string[]> _allRows = new();
+    private int _currentPage = 1;
+    private string? _status;
+
+    private int TotalPages => _allRows.Count == 0
+        ? 1
+        : (int)Math.Ceiling(_allRows.Count / (double)PageSize);
+
+    private IEnumerable<string[]> PageRows()
+    {
+        return _allRows
+            .Skip((_currentPage - 1) * PageSize)
+            .Take(PageSize);
+    }
+
+    private void GoToPage(int page)
+    {
+        _currentPage = Math.Clamp(page, 1, TotalPages);
+    }
+
+    private IEnumerable<int> VisiblePages()
+    {
+        int total = TotalPages;
+        int current = _currentPage;
+
+        if (total <= 7)
+        {
+            for (int i = 1; i <= total; i++) yield return i;
+            yield break;
+        }
+
+        yield return 1;
+
+        int start = Math.Max(2, current - 2);
+        int end = Math.Min(total - 1, current + 2);
+
+        if (start > 2) yield return -1;
+
+        for (int i = start; i <= end; i++) yield return i;
+
+        if (end < total - 1) yield return -1;
+
+        yield return total;
+    }
+
+    private async Task OnFileSelected(InputFileChangeEventArgs e)
+    {
+        _columns.Clear();
+        _selected.Clear();
+        _allRows.Clear();
+        _previewColumns.Clear();
+        _currentPage = 1;
+        _status = null;
+
+        var file = e.File;
+        if (file is null) return;
+
+        var tempDir = Path.Combine(Path.GetTempPath(), "atipt-import");
+        Directory.CreateDirectory(tempDir);
+        var tempPath = Path.Combine(tempDir, file.Name);
+
+        State.SelectedFileName = file.Name;
+        State.CurrentInputFileName = file.Name;
+        State.CurrentInputFilePath = tempPath;
+
+        State.SetBusy("Reading file ...");
+        await Task.Delay(20);
+
+        try
+        {
+            await using (var fs = File.Create(tempPath))
+                await file.OpenReadStream(maxAllowedSize: 200 * 1024 * 1024).CopyToAsync(fs);
+
+            _columns = await Task.Run(() => Import.ReadFile(tempPath).ToList());
+        }
+        catch (Exception ex)
+        {
+            _status = $"Failed to read file: {ex.Message}";
+            State.SetBusy(null);
+            return;
+        }
+
+        State.SetBusy(null);
+
+        if (_columns.Count == 0)
+        {
+            _status = "No columns detected. Check that the first line is the header and "
+                    + "values are separated by tab, comma, semicolon, or space.";
+            return;
+        }
+
+        foreach (var c in _columns) _selected.Add(c.Name);
+        _status = $"Detected {_columns.Count} column(s).";
+    }
+
+    private void Toggle(string name, ChangeEventArgs e)
+    {
+        if ((bool)(e.Value ?? false)) _selected.Add(name);
+        else _selected.Remove(name);
+    }
+
+    private void Extract()
+    {
+        _previewColumns = _columns
+            .Where(c => _selected.Contains(c.Name))
+            .Select(c => c.Name)
+            .ToList();
+
+        _allRows.Clear();
+        _currentPage = 1;
+
+        if (_previewColumns.Count == 0)
+        {
+            _status = "Select at least one column first.";
+            return;
+        }
+
+        int total = _columns
+            .Where(c => _selected.Contains(c.Name))
+            .Select(c => c.Values.Count)
+            .DefaultIfEmpty(0)
+            .Min();
+
+        for (int r = 0; r < total; r++)
+        {
+            var row = new string[_previewColumns.Count];
+            for (int c = 0; c < _previewColumns.Count; c++)
+            {
+                var col = _columns.First(x => x.Name == _previewColumns[c]);
+                row[c] = r < col.Values.Count
+                    ? col.Values[r].ToString("G6", CultureInfo.InvariantCulture)
+                    : "";
+            }
+            _allRows.Add(row);
+        }
+
+        _status = $"Extracted {_allRows.Count} row(s).";
+    }
+
+    private Task ImportAsync()
+    {
+        State.ImportedVariables = _columns
+            .Where(c => _selected.Contains(c.Name))
+            .Select(c =>
+            {
+                var v = new Variable(c.Name);
+                v.Values.AddRange(c.Values);
+                return v;
+            })
+            .ToList();
+
+        State.Case.ImportedVariables = State.ImportedVariables.ToList();
+
+        State.EnableAfterImport();
+        State.NotifyChanged();
+
+        Nav.NavigateTo("/select-inputs");
+        return Task.CompletedTask;
+    }
+
+    // Full reset — matches the old project's behaviour where clicking the
+    // ribbon's Import button created a brand-new FormDataExtraction
+    // instance and cleared any previous extraction state.
+    private void Cancel()
+    {
+        _columns.Clear();
+        _selected.Clear();
+        _allRows.Clear();
+        _previewColumns.Clear();
+        _currentPage = 1;
+        _status = null;
+
+        State.ClearImportState();
+    }
+}

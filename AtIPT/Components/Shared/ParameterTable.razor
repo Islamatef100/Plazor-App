@@ -1,0 +1,44 @@
+﻿<table class="grid">
+    <thead>
+        <tr>
+            <th>Parameter Name (Unit)</th>
+            <th>Value</th>
+            @if (ShowBounds)
+            {
+                <th>Min</th>
+                <th>Max</th>
+            }
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var p in Parameters)
+        {
+            <tr>
+                <td>@p.Name @(string.IsNullOrEmpty(p.Unit) ? "" : $"({p.Unit})")</td>
+                <td>
+                    <input class="input" type="number" step="any"
+                           @bind="p.Value" @bind:after="NotifyAsync" />
+                </td>
+                @if (ShowBounds)
+                {
+                    <td>
+                        <input class="input" type="number" step="any"
+                               @bind="p.Min" @bind:after="NotifyAsync" />
+                    </td>
+                    <td>
+                        <input class="input" type="number" step="any"
+                               @bind="p.Max" @bind:after="NotifyAsync" />
+                    </td>
+                }
+            </tr>
+        }
+    </tbody>
+</table>
+
+@code {
+    [Parameter, EditorRequired] public List<Parameter> Parameters { get; set; } = new();
+    [Parameter] public bool ShowBounds { get; set; }
+    [Parameter] public Func<Task> Changed { get; set; } = () => Task.CompletedTask;
+
+    private Task NotifyAsync() => Changed();
+}

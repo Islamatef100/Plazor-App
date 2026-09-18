@@ -1,0 +1,223 @@
+﻿@page "/auto-run-solutions"
+@inject AppState State
+@inject IExcelExportService Excel
+@inject IJSRuntime JS
+@using AtIPT.Components.Shared
+@using AtIPT.Application.Services
+@implements IDisposable
+
+<PageTitle>Auto Run Solutions</PageTitle>
+
+<PageHeader Title="Auto Run Solutions"
+            Subtitle="Every solution produced by the last auto run." />
+
+@if (State.Case.Runs.Count == 0)
+{
+    <AppCard>
+        <p class="muted">No solutions yet.</p>
+    </AppCard>
+}
+else
+{
+    <div class="solutions-layout">
+        <aside class="solutions-list">
+            <div class="solutions-list-header">Solutions</div>
+            @for (int i = 0; i < _sorted.Count; i++)
+            {
+                var realIdx = _sorted[i];
+                var fit = _fitnesses[realIdx];
+                var isBest = i == 0;
+                <div class="solution-item @(_selected == realIdx ? "active" : "")"
+                     style="@(isBest && _selected != realIdx ? "border-left:4px solid #198754;" : "")"
+                     @onclick="() => Select(realIdx)">
+                    <strong>Solution @(realIdx + 1)</strong>
+                    <span class="muted">Residual Error = @fit.ToString("0.000000")</span>
+                </div>
+            }
+        </aside>
+
+        <section class="solutions-detail">
+            @if (_selected >= 0 && _selected < State.Case.Runs.Count)
+            {
+                var run = State.Case.Runs[_selected];
+                <AppCard Title="@($"Solution {_selected + 1} — Residual Error = {_fitnesses[_selected]:0.000000}")">
+                    <InteractiveChart Series="BuildSeriesFor(run)"
+                                      XTitle="Shut-in Time (hr)"
+                                      YTitle="DeltaP / Derivative"
+                                      LogX="true"
+                                      LogY="true"
+                                      ShowExportButton="true"
+                                      ExportRequested="ExportSelectedAsync" />
+                </AppCard>
+
+                @if (_selected < State.Case.RunParameters.Count)
+                {
+                    <AppCard Title="Parameters">
+                        <table class="grid">
+                            <thead>
+                                <tr><th>Parameter Name (Unit)</th><th>Value</th></tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var p in State.Case.RunParameters[_selected])
+                                {
+                                    if (!p.Enabled) continue;
+                                    <tr>
+                                        <td>@p.Name</td>
+                                        <td>@p.Value.ToString("G6")</td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </AppCard>
+                }
+            }
+        </section>
+    </div>
+}
+
+<div class="toolbar">
+    <button class="btn primary"
+            disabled="@(_selected < 0)"
+            @onclick="() => ExportSelectedAsync()">
+        Export Selected Solution
+    </button>
+    <button class="btn"
+            disabled="@(State.Case.Runs.Count == 0)"
+            @onclick="() => ExportAllAsync()">
+        Export All Solutions
+    </button>
+    <input class="input" type="number" min="1" style="width:80px;"
+           value="@_exportBestN" @oninput="OnBestNChanged" />
+    <button class="btn"
+            disabled="@(State.Case.Runs.Count == 0)"
+            @onclick="() => ExportBestNAsync()">
+        Export Best N Solutions
+    </button>
+</div>
+
+@code {
+    private List<int> _sorted = new();
+    private List<double> _fitnesses = new();
+    private int _selected = -1;
+    private int _exportBestN = 10;
+
+    protected override void OnInitialized()
+    {
+        State.OnChange += OnChanged;
+        Rebuild();
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    private void Rebuild()
+    {
+        var runs = State.Case.Runs;
+        var fits = State.Case.SolutionFitnesses;
+
+        _fitnesses = new List<double>();
+        _sorted = new List<int>();
+
+        for (int i = 0; i < runs.Count; i++)
+        {
+            _fitnesses.Add(i < fits.Count ? fits[i] : 1000);
+            _sorted.Add(i);
+        }
+
+        _sorted.Sort((a, b) => _fitnesses[a].CompareTo(_fitnesses[b]));
+
+        if (_selected < 0 && _sorted.Count > 0)
+            _selected = _sorted[0];
+    }
+
+    private void Select(int idx) => _selected = idx;
+
+    private void OnBestNChanged(ChangeEventArgs e)
+    {
+        var s = e.Value?.ToString() ?? "10";
+        _exportBestN = int.TryParse(s, out var n) && n > 0 ? n : 10;
+    }
+
+    private IReadOnlyList<ChartSeries> BuildSeriesFor(Variable[] run) => new[]
+    {
+        new ChartSeries { Name = "DeltaP", Color = "#0d6efd",
+            X = run[0].Values, Y = run[1].Values, Visible = true },
+        new ChartSeries { Name = "Derivative", Color = "#dc3545",
+            X = run[0].Values, Y = run[2].Values, Visible = true, PointMarkers = true }
+    };
+
+    private async Task ExportSelectedAsync()
+    {
+        if (_selected < 0) return;
+        var run = State.Case.Runs[_selected];
+
+        var rows = new List<IReadOnlyList<string>>
+        {
+            new[] { "Shut-in Time (hr)", "DeltaP", "Derivative" }
+        };
+        for (int i = 0; i < run[0].Values.Count; i++)
+        {
+            rows.Add(new[]
+            {
+                run[0].Values[i].ToString("G10", CultureInfo.InvariantCulture),
+                run[1].Values[i].ToString("G10", CultureInfo.InvariantCulture),
+                run[2].Values[i].ToString("G10", CultureInfo.InvariantCulture)
+            });
+        }
+
+        var bytes = Excel.CreateWorkbook(new Dictionary<string, IReadOnlyList<IReadOnlyList<string>>>
+        {
+            [$"Solution {_selected + 1}"] = rows
+        });
+
+        await JS.InvokeVoidAsync("atipt.downloadFile",
+            $"Solution_{_selected + 1}.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            bytes);
+    }
+
+    private async Task ExportAllAsync()
+    {
+        var bytes = Excel.CreateWorkbook(ExportBuilder.Build(State.Case));
+
+        await JS.InvokeVoidAsync("atipt.downloadFile",
+            "ATIPT_Export.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            bytes);
+    }
+
+    private async Task ExportBestNAsync()
+    {
+        int n = Math.Min(_exportBestN, _sorted.Count);
+        var sheets = new Dictionary<string, IReadOnlyList<IReadOnlyList<string>>>();
+
+        for (int k = 0; k < n; k++)
+        {
+            int idx = _sorted[k];
+            var run = State.Case.Runs[idx];
+
+            var rows = new List<IReadOnlyList<string>>
+            {
+                new[] { "Shut-in Time (hr)", "DeltaP", "Derivative" }
+            };
+            for (int i = 0; i < run[0].Values.Count; i++)
+            {
+                rows.Add(new[]
+                {
+                    run[0].Values[i].ToString("G10", CultureInfo.InvariantCulture),
+                    run[1].Values[i].ToString("G10", CultureInfo.InvariantCulture),
+                    run[2].Values[i].ToString("G10", CultureInfo.InvariantCulture)
+                });
+            }
+            sheets[$"Solution {idx + 1}"] = rows;
+        }
+
+        var bytes = Excel.CreateWorkbook(sheets);
+
+        await JS.InvokeVoidAsync("atipt.downloadFile",
+            $"ATIPT_Best_{n}.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            bytes);
+    }
+
+    public void Dispose() => State.OnChange -= OnChanged;
+}

@@ -1,0 +1,455 @@
+﻿@page "/simulation-setup"
+@inject AppState State
+@inject IAnalysisService Analysis
+@inject ISimulationRunner Runner
+@inject ISolverFileService Files
+@inject NavigationManager Nav
+@using AtIPT.Infrastructure.Simulation
+
+<PageTitle>Simulation Setup</PageTitle>
+
+<PageHeader Title="Simulation Setup"
+            Subtitle="Choose model, shrinkage and fracture type, then set the parameter bounds." />
+
+<AppCard Title="Model Selection">
+    <select class="input" @bind="State.Case.ModelSelection" @bind:after="OnModelOrShrinkageChanged">
+        <option value="@ModelSelection.InfiniteConductivity">Infinite Conductivity</option>
+        <option value="@ModelSelection.FiniteSingleMobility">Finite Conductivity With Single Mobility</option>
+        <option value="@ModelSelection.FiniteDualMobility">Finite Conductivity With Dual Mobility</option>
+    </select>
+</AppCard>
+
+<AppCard Title="Type Selection">
+    <div class="row">
+        <label style="width:180px;">Shrinkage Type</label>
+        <select class="input" @bind="State.Case.ShrinkageType" @bind:after="OnModelOrShrinkageChanged">
+            <option value="@ShrinkageType.None">No Shrinkage</option>
+            <option value="@ShrinkageType.HeightOnly">Height Shrinkage Only</option>
+            <option value="@ShrinkageType.LengthOnly">Length Shrinkage Only</option>
+            <option value="@ShrinkageType.Both">Both Height and Length Shrinkage</option>
+        </select>
+    </div>
+    <div class="row">
+        <label style="width:180px;">Fracture Type</label>
+        <select class="input" @bind="State.Case.FractureType">
+            <option value="@FractureType.KGD">KGD</option>
+            <option value="@FractureType.PKN">PKN</option>
+            <option value="@FractureType.Ellipsoidal">Ellipsoidal</option>
+        </select>
+    </div>
+</AppCard>
+
+<AppCard Title="Unit System">
+    <div class="unit-system">
+        <label class="radio-line">
+            <input type="radio" name="unitSystem" checked disabled />
+            <span>Oil Field</span>
+        </label>
+        <label class="radio-line">
+            <input type="radio" name="unitSystem" disabled />
+            <span>Metric</span>
+        </label>
+    </div>
+</AppCard>
+
+<AppCard Title="Parameters">
+    <table class="grid params-grid">
+        <thead>
+            <tr>
+                <th style="width:320px;">Parameter Name (Unit)</th>
+                <th style="width:140px;">Min</th>
+                <th style="width:140px;">Max</th>
+                <th style="width:140px;">User Guess</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var p in VisibleAnalysisParameters())
+            {
+                <tr>
+                    <td>@p.Name @(string.IsNullOrEmpty(p.Unit) ? "" : $"({p.Unit})")</td>
+                    <td>
+                        <input class="input" type="number" step="any"
+                               @bind="p.Min" @bind:after="OnParameterChanged" />
+                    </td>
+                    <td>
+                        <input class="input" type="number" step="any"
+                               @bind="p.Max" @bind:after="OnParameterChanged" />
+                    </td>
+                    <td>
+                        <input class="input" type="number" step="any"
+                               @bind="p.Value" @bind:after="OnParameterChanged" />
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</AppCard>
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="error">@_error</div>
+}
+
+<div class="action-row">
+    <div class="action-left">
+        <button class="btn" @onclick="() => Cancel()">Cancel</button>
+    </div>
+    <div class="action-right">
+        <button class="btn" disabled="@State.IsBusy" @onclick="() => SetBoundsAsync()">Set Bounds</button>
+        <button class="btn primary" disabled="@State.IsBusy" @onclick="() => AutoRunClick()">Auto Run ...</button>
+        <button class="btn" disabled="@State.IsBusy" @onclick="() => TestGuessAsync()">Test Guess</button>
+
+        @if (State.IsBusy)
+        {
+            <button class="btn" @onclick="() => StopAsync()">Stop</button>
+        }
+    </div>
+</div>
+
+<TerminationCriteriaDialog Visible="_showTerminationDialog"
+                           Confirm="AutoRunAsync"
+                           Cancel="CancelTerminationDialog" />
+
+<ConfirmDialog Visible="_showBoundsWarning"
+               Title="Confirm"
+               Message="It is recommended that option &quot;Set Bounds&quot; be used first to ensure field data curves fall between bound curves.  Do you want to continue?"
+               Result="OnBoundsWarningResult" />
+
+@code {
+    private string? _error;
+    private bool _showTerminationDialog;
+    private bool _showBoundsWarning;
+    private int _solutionsFound;
+
+    protected override void OnInitialized()
+    {
+        UpdateAnalysisParameterVisibility();
+    }
+
+    private void UpdateAnalysisParameterVisibility()
+    {
+        var c = State.Case;
+        var p = c.AnalysisParameters;
+        var model = c.ModelSelection;
+        var shrink = c.ShrinkageType;
+
+        p[0].Enabled  = true;
+        p[1].Enabled  = false;
+        p[2].Enabled  = false;
+        p[3].Enabled  = false;
+        p[4].Enabled  = true;
+        p[5].Enabled  = shrink == ShrinkageType.HeightOnly || shrink == ShrinkageType.Both;
+        p[6].Enabled  = shrink == ShrinkageType.HeightOnly || shrink == ShrinkageType.Both;
+        p[7].Enabled  = shrink == ShrinkageType.LengthOnly || shrink == ShrinkageType.Both;
+        p[8].Enabled  = model != ModelSelection.InfiniteConductivity;
+        p[9].Enabled  = model != ModelSelection.InfiniteConductivity;
+        p[10].Enabled = model != ModelSelection.FiniteSingleMobility;
+        p[11].Enabled = false;
+        p[12].Enabled = false;
+        p[13].Enabled = false;
+    }
+
+    private List<Parameter> VisibleAnalysisParameters()
+        => State.Case.AnalysisParameters.Where(p => p.Enabled).ToList();
+
+    private Task OnModelOrShrinkageChanged()
+    {
+        UpdateAnalysisParameterVisibility();
+        State.NotifyChanged();
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private Task OnParameterChanged()
+    {
+        State.NotifyChanged();
+        return Task.CompletedTask;
+    }
+
+    private bool PassesMobilityCheck()
+    {
+        var msg = Analysis.CheckMobility(State.Case);
+        if (msg is null) return true;
+        _error = msg;
+        StateHasChanged();
+        return false;
+    }
+
+    private async Task SetBoundsAsync()
+    {
+        _error = null;
+        if (!PassesMobilityCheck()) return;
+
+        var c = State.Case;
+        var err = Analysis.ValidateBounds(c, c.Parameters[1].Value);
+        if (err is not null) { _error = err; StateHasChanged(); return; }
+
+        State.SetBusy("Generating Bounds ...");
+        try
+        {
+            await Files.WriteUnitSystemAsync(false);
+            await Files.WriteShrinkageFractureTypeAsync(c);
+            await Files.WriteBoundaryValuesAsync(c);
+
+            var minInput = SolverInputBuilder.Build(c, RunMode.Min);
+            var minRes = await Runner.RunAsync(ResolveExe(c, withGA: false), minInput);
+            if (minRes.Success)
+            {
+                var parsed = SolverOutputParser.Parse(minRes.OutputPath!);
+                c.InitialGuessMin.Clear();
+                c.InitialGuessMin.AddRange(parsed);
+            }
+
+            var maxInput = SolverInputBuilder.Build(c, RunMode.Max);
+            var maxRes = await Runner.RunAsync(ResolveExe(c, withGA: false), maxInput);
+            if (maxRes.Success)
+            {
+                var parsed = SolverOutputParser.Parse(maxRes.OutputPath!);
+                c.InitialGuessMax.Clear();
+                c.InitialGuessMax.AddRange(parsed);
+            }
+
+            State.MarkBoundsSetForCurrent();
+        }
+        finally
+        {
+            State.SetBusy(null);
+            State.NotifyChanged();
+        }
+
+        State.EnableAfterSetBounds();
+        Nav.NavigateTo("/bound-curves");
+    }
+
+    private async Task TestGuessAsync()
+    {
+        _error = null;
+        if (!PassesMobilityCheck()) return;
+
+        var c = State.Case;
+        var err = Analysis.ValidateUserGuess(c, c.Parameters[1].Value);
+        if (err is not null) { _error = err; StateHasChanged(); return; }
+
+        State.SetBusy("Generating The Solution ...");
+        bool ok = false;
+
+        try
+        {
+            await Files.WriteUnitSystemAsync(false);
+            await Files.WriteShrinkageFractureTypeAsync(c);
+            await Files.WriteBoundaryValuesAsync(c);
+
+            var input = SolverInputBuilder.Build(c, RunMode.User);
+            var res = await Runner.RunAsync(ResolveExe(c, withGA: false), input);
+
+            if (!res.Success)
+            {
+                _error = $"Solver error: {res.ErrorMessage}";
+            }
+            else
+            {
+                var result = SolverOutputParser.ParseFull(res.OutputPath!);
+                var parsed = result.Series;
+
+                if (parsed.Count < 3 || parsed[0].Values.Count == 0)
+                {
+                    _error = "Test Guess completed but the solver produced no data.";
+                }
+                else
+                {
+                    c.SimulationResults.Clear();
+                    c.SimulationResults.AddRange(parsed);
+                    c.TestGuessFitness = result.Fitness;
+                    ok = true;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = $"Test Guess failed: {ex.Message}";
+        }
+        finally
+        {
+            State.SetBusy(null);
+            State.NotifyChanged();
+        }
+
+        if (!ok) { StateHasChanged(); return; }
+
+        State.EnableAfterTestGuess();
+        Nav.NavigateTo("/user-guess-match");
+    }
+
+    private void AutoRunClick()
+    {
+        _error = null;
+        if (!PassesMobilityCheck()) return;
+
+        if (!State.IsBoundsSetForCurrent())
+        {
+            _showBoundsWarning = true;
+            StateHasChanged();
+            return;
+        }
+
+        OpenTerminationDialog();
+    }
+
+    private Task OnBoundsWarningResult(bool yes)
+    {
+        _showBoundsWarning = false;
+        if (yes) OpenTerminationDialog();
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private void OpenTerminationDialog()
+    {
+        _showTerminationDialog = true;
+        StateHasChanged();
+    }
+
+    private Task CancelTerminationDialog()
+    {
+        _showTerminationDialog = false;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private async Task AutoRunAsync(double? errorTarget)
+    {
+        _showTerminationDialog = false;
+        StateHasChanged();
+
+        var c = State.Case;
+        var err = Analysis.ValidateBounds(c, c.Parameters[1].Value);
+        if (err is not null) { _error = err; StateHasChanged(); return; }
+
+        await Files.WriteErrorToReachAsync(errorTarget);
+        await Files.WriteUnitSystemAsync(false);
+        await Files.WriteShrinkageFractureTypeAsync(c);
+        await Files.WriteBoundaryValuesAsync(c);
+
+        c.Runs.Clear();
+        c.RunParameters.Clear();
+        c.SolutionFitnesses.Clear();
+        _solutionsFound = 0;
+
+        State.SolverCts = new CancellationTokenSource();
+        var ct = State.SolverCts.Token;
+
+        State.SetBusy("Generating Solutions ...");
+
+        var input = SolverInputBuilder.Build(c, RunMode.User);
+        var watcher = WatchSolverOutputAsync(ct);
+        var res = await Runner.RunAsync(ResolveExe(c, withGA: true), input, ct);
+
+        try { State.SolverCts?.Cancel(); } catch { }
+        try { await watcher; } catch { }
+        await TryAddLastSolutionAsync();
+
+        State.SetBusy(null);
+        State.SolverCts = null;
+        State.NotifyChanged();
+
+        if (!res.Success && res.ErrorMessage != "Cancelled.")
+            _error = res.ErrorMessage;
+
+        State.EnableAfterAutoRun();
+        Nav.NavigateTo("/auto-run-solutions");
+    }
+
+    private async Task WatchSolverOutputAsync(CancellationToken ct)
+    {
+        var outputDer = Runner.OutputDerPath;
+        long lastTicks = 0;
+
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                if (File.Exists(outputDer))
+                {
+                    var ticks = File.GetLastWriteTimeUtc(outputDer).Ticks;
+                    if (ticks != lastTicks && new FileInfo(outputDer).Length > 0)
+                    {
+                        lastTicks = ticks;
+                        var result = SolverOutputParser.ParseFull(outputDer);
+                        if (result.Series.Count >= 3 && result.Series[0].Values.Count > 0)
+                        {
+                            _solutionsFound++;
+                            State.Case.Runs.Add(result.Series.ToArray());
+                            State.Case.SolutionFitnesses.Add(result.Fitness ?? 1000);
+                            State.Case.RunParameters.Add(
+                                State.Case.AnalysisParameters.Select(p => p.Clone()).ToArray());
+                            await InvokeAsync(() => State.SetBusy($"Solution found {_solutionsFound}"));
+                        }
+                    }
+                }
+                await Task.Delay(3000, ct);
+            }
+            catch (OperationCanceledException) { break; }
+            catch { }
+        }
+    }
+
+    private async Task TryAddLastSolutionAsync()
+    {
+        var outputDer = Runner.OutputDerPath;
+        if (!File.Exists(outputDer)) return;
+
+        var result = SolverOutputParser.ParseFull(outputDer);
+        if (result.Series.Count < 3 || result.Series[0].Values.Count == 0) return;
+
+        if (State.Case.Runs.Count > 0)
+        {
+            var last = State.Case.Runs[^1][0].Values;
+            if (last.Count == result.Series[0].Values.Count
+                && Math.Abs(last[^1] - result.Series[0].Values[^1]) < 1e-9)
+                return;
+        }
+
+        _solutionsFound++;
+        State.Case.Runs.Add(result.Series.ToArray());
+        State.Case.SolutionFitnesses.Add(result.Fitness ?? 1000);
+        State.Case.RunParameters.Add(
+            State.Case.AnalysisParameters.Select(p => p.Clone()).ToArray());
+
+        await InvokeAsync(() => State.SetBusy($"Solution found {_solutionsFound}"));
+    }
+
+    private async Task StopAsync()
+    {
+        try { State.SolverCts?.Cancel(); } catch { }
+        await Runner.KillAllAsync();
+        State.SetBusy(null);
+        State.NotifyChanged();
+    }
+
+    private Task Cancel()
+    {
+        Nav.NavigateTo("/model-parameters");
+        return Task.CompletedTask;
+    }
+
+    private static string ResolveExe(SimCase c, bool withGA)
+    {
+        if (c.ShrinkageType != ShrinkageType.None)
+        {
+            return c.ModelSelection switch
+            {
+                ModelSelection.InfiniteConductivity => withGA ? "IPTSH_inFinite_With_GA.exe"      : "IPTSH_inFinite_Without_GA.exe",
+                ModelSelection.FiniteSingleMobility => withGA ? "IPTSH_Single_Finite_With_GA.exe" : "IPTSH_Single_Finite_Without_GA.exe",
+                ModelSelection.FiniteDualMobility   => withGA ? "IPTSH_Finite_dual_With_GA.exe"   : "IPTSH_Finite_dual_Without_GA.exe",
+                _                                    => "IPTSH_inFinite_With_GA.exe"
+            };
+        }
+        return c.ModelSelection switch
+        {
+            ModelSelection.InfiniteConductivity => withGA ? "IPT_inFinite_With_GA.exe"      : "IPT_inFinite_Without_GA.exe",
+            ModelSelection.FiniteSingleMobility => withGA ? "IPT_Single_Finite_With_GA.exe" : "IPT_Single_Finite_Without_GA.exe",
+            ModelSelection.FiniteDualMobility   => withGA ? "IPT_Dual_Finite_With_GA.exe"   : "IPT_Dual_Finite_Without_GA.exe",
+            _                                    => "IPT_inFinite_With_GA.exe"
+        };
+    }
+}

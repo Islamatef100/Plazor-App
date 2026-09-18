@@ -1,0 +1,534 @@
+﻿@inherits LayoutComponentBase
+@inject IThemeService Theme
+@inject AppState State
+@inject IProjectRepository Repo
+@inject IExcelExportService Excel
+@inject ISimulationRunner Runner
+@inject NavigationManager Nav
+@inject IJSRuntime JS
+@using AtIPT.Application.Services
+@implements IDisposable
+
+<div class="app-shell" data-theme="@(Theme.Current == AppTheme.Dark ? "dark" : "light")">
+
+    <header class="app-header">
+        <div class="brand">
+            <img src="logo.png" alt="ATIPT" />
+            <span>ATIPT Web Platform</span>
+        </div>
+
+        <div class="header-actions">
+            @if (State.CanAutoRunSolutions)
+            {
+                <button class="header-link" @onclick="() => GoAutoRunSolutions()">Show Results</button>
+            }
+            @if (State.IsBusy)
+            {
+                <button class="header-link" @onclick="() => StopAsync()">Stop</button>
+            }
+            <button class="theme-toggle" @onclick="() => ToggleTheme()">
+                @(Theme.Current == AppTheme.Light ? "🌙 Dark Mode" : "☀️ Light Mode")
+            </button>
+        </div>
+    </header>
+
+    <nav class="ribbon">
+        <div class="ribbon-group">
+            <div class="ribbon-group-items">
+                <button class="ribbon-btn" disabled="@(!State.CanOpen)" @onclick="() => OpenProject()">
+                    <svg class="ribbon-icon" viewBox="0 0 24 24">
+                        <path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                    </svg>
+                    <span>Open</span>
+                </button>
+                <button class="ribbon-btn" disabled="@(!State.CanImport)" @onclick="() => GoImport()">
+                    <svg class="ribbon-icon" viewBox="0 0 24 24">
+                        <path d="M12 3v12" />
+                        <path d="M7 10l5 5 5-5" />
+                        <path d="M4 20h16" />
+                    </svg>
+                    <span>Import</span>
+                </button>
+                <button class="ribbon-btn" disabled="@(!State.CanSave)" @onclick="() => OpenSaveDialog()">
+                    <svg class="ribbon-icon" viewBox="0 0 24 24">
+                        <path d="M4 4h12l4 4v12H4z" />
+                        <path d="M8 4v6h8V4" />
+                        <path d="M8 20v-6h8v6" />
+                    </svg>
+                    <span>Save</span>
+                </button>
+                <button class="ribbon-btn" disabled="@(!State.CanSaveAs)" @onclick="() => OpenSaveAsDialog()">
+                    <svg class="ribbon-icon" viewBox="0 0 24 24">
+                        <path d="M4 4h12l4 4v12H4z" />
+                        <path d="M8 4v6h8V4" />
+                        <path d="M14 15h6M17 12v6" />
+                    </svg>
+                    <span>Save As</span>
+                </button>
+                <button class="ribbon-btn" disabled="@(!State.CanExit)" @onclick="() => OpenExitDialog()">
+                    <svg class="ribbon-icon" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="M9 9l6 6M15 9l-6 6" />
+                    </svg>
+                    <span>Exit</span>
+                </button>
+            </div>
+            <div class="ribbon-group-label">File</div>
+        </div>
+
+        <div class="ribbon-group">
+            <div class="ribbon-group-items">
+                <button class="ribbon-btn" disabled="@(!State.CanSelectInputs)" @onclick="() => GoSelectInputs()">
+                    <svg class="ribbon-icon" viewBox="0 0 24 24">
+                        <rect x="6" y="3" width="12" height="18" rx="6" />
+                        <path d="M12 3v8" />
+                    </svg>
+                    <span>Select Input</span>
+                </button>
+                <button class="ribbon-btn" disabled="@(!State.CanModelParameters)" @onclick="() => GoModelParameters()">
+                    <svg class="ribbon-icon" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="3" />
+                        <path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" />
+                    </svg>
+                    <span>Model Parameters</span>
+                </button>
+            </div>
+            <div class="ribbon-group-label">Data</div>
+        </div>
+
+        <div class="ribbon-group">
+            <div class="ribbon-group-items">
+                <button class="ribbon-btn" disabled="@(!State.CanSimulationSetup)" @onclick="() => GoSimulationSetup()">
+                    <svg class="ribbon-icon" viewBox="0 0 24 24">
+                        <rect x="3" y="4" width="18" height="12" rx="1" />
+                        <path d="M8 20h8M12 16v4" />
+                    </svg>
+                    <span>Simulation Setup</span>
+                </button>
+            </div>
+            <div class="ribbon-group-label">Analysis</div>
+        </div>
+
+        <div class="ribbon-group">
+            <div class="ribbon-group-items">
+                <button class="ribbon-btn" disabled="@(!State.CanRawData)" @onclick="() => GoFieldPressureFalloff()">
+                    <svg class="ribbon-icon" viewBox="0 0 24 24">
+                        <ellipse cx="12" cy="6" rx="7" ry="3" />
+                        <path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6" />
+                        <path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6" />
+                    </svg>
+                    <span>Field Pressure Falloff</span>
+                </button>
+                <button class="ribbon-btn" disabled="@(!State.CanDiffPressure)" @onclick="() => GoShutInCurves()">
+                    <svg class="ribbon-icon" viewBox="0 0 24 24">
+                        <ellipse cx="12" cy="6" rx="7" ry="3" />
+                        <path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6" />
+                    </svg>
+                    <span>Shut-in Curves</span>
+                </button>
+                <button class="ribbon-btn" disabled="@(!State.CanBoundCurves)" @onclick="() => GoBoundCurves()">
+                    <svg class="ribbon-icon" viewBox="0 0 24 24">
+                        <path d="M4 20V4M4 20h16" />
+                        <path d="M4 16c3-4 6-6 9-6s5 2 7 4" />
+                    </svg>
+                    <span>Bound Curves</span>
+                </button>
+                <button class="ribbon-btn" disabled="@(!State.CanUserGuessMatch)" @onclick="() => GoUserGuessMatch()">
+                    <svg class="ribbon-icon" viewBox="0 0 24 24">
+                        <circle cx="12" cy="8" r="4" />
+                        <path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8" />
+                    </svg>
+                    <span>User Guess Match</span>
+                </button>
+            </div>
+            <div class="ribbon-group-label">Charts</div>
+        </div>
+
+        <div class="ribbon-group">
+            <div class="ribbon-group-items">
+                <button class="ribbon-btn" disabled="@(!State.CanAutoRunSolutions)" @onclick="() => GoAutoRunSolutions()">
+                    <svg class="ribbon-icon" viewBox="0 0 24 24">
+                        <path d="M13 2L4 14h7l-1 8 9-12h-7z" />
+                    </svg>
+                    <span>Auto Run Solutions</span>
+                </button>
+                <button class="ribbon-btn"
+                        disabled="@(!State.CanRawData || _ribbonExportBusy)"
+                        @onclick="() => ExportAsync()">
+                    <svg class="ribbon-icon" viewBox="0 0 24 24">
+                        <path d="M4 4h10l6 6v10H4z" />
+                        <path d="M14 4v6h6" />
+                        <path d="M8 14h8M8 17h5" />
+                    </svg>
+                    <span>@(_ribbonExportBusy ? "Exporting…" : "Export")</span>
+                </button>
+            </div>
+            <div class="ribbon-group-label">Excel</div>
+        </div>
+
+        <div class="ribbon-group">
+            <div class="ribbon-group-items">
+                <button class="ribbon-btn" disabled="@(!State.CanLoadHistory)" @onclick="() => GoLoadHistory()">
+                    <svg class="ribbon-icon" viewBox="0 0 24 24">
+                        <circle cx="12" cy="12" r="9" />
+                        <path d="M12 7v5l3 2" />
+                        <path d="M3 12a9 9 0 0 1 9-9" />
+                    </svg>
+                    <span>Load History</span>
+                </button>
+            </div>
+            <div class="ribbon-group-label">Load Last History</div>
+        </div>
+    </nav>
+
+    <div class="body-area @(_sidebarCollapsed ? "collapsed" : "")">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                @if (!_sidebarCollapsed)
+                {
+                    <span>Projects</span>
+                }
+                <button class="sidebar-toggle"
+                        @onclick="() => ToggleSidebar()"
+                        title="@(_sidebarCollapsed ? "Expand" : "Collapse")">
+                    @(_sidebarCollapsed ? "▶" : "◀")
+                </button>
+            </div>
+
+            @if (!_sidebarCollapsed)
+            {
+                <div class="sidebar-body">
+                    @if (_projects.Count == 0)
+                    {
+                        <p class="muted" style="padding:8px;">No projects yet.</p>
+                    }
+                    else
+                    {
+                        <ProjectTree Nodes="_projects"
+                                     Select="OpenProjectAsync"
+                                     DoubleClick="OpenProjectAsync"
+                                     RightClick="ShowContextMenu" />
+                    }
+                </div>
+            }
+        </aside>
+
+        <main class="content">
+            @Body
+        </main>
+    </div>
+
+    <LoadingOverlay />
+
+    <SaveProjectDialog Visible="_showSaveDialog"
+                       SaveAsMode="_saveDialogSaveAsMode"
+                       Close="CloseSaveDialog"
+                       Saved="RefreshProjectsAsync" />
+
+    <ContextMenu Visible="_ctxVisible"
+                 X="_ctxX"
+                 Y="_ctxY"
+                 Items="_ctxItems"
+                 Close="CloseContextMenu" />
+
+    <RenameOverlay ShowRename="_showRename"
+                   RenameValue="@_renameValue"
+                   RenameValueChanged="OnRenameValueChanged"
+                   InfoText="@_showInfo"
+                   Confirm="ConfirmRenameAsync"
+                   Cancel="CloseRename"
+                   CloseInfo="CloseInfo" />
+
+    <ConfirmDialog Visible="_showExitConfirm"
+                   Title="Confirm"
+                   Message="Are you sure you want to close ATIPT?"
+                   Result="OnExitConfirmResult" />
+</div>
+
+@code {
+    private bool _showSaveDialog;
+    private bool _saveDialogSaveAsMode;
+    private bool _sidebarCollapsed;
+    private bool _ribbonExportBusy;
+    private IReadOnlyList<ProjectNode> _projects = Array.Empty<ProjectNode>();
+
+    private bool _ctxVisible;
+    private double _ctxX;
+    private double _ctxY;
+    private ProjectNode? _ctxNode;
+    private IReadOnlyList<ContextMenu.Item> _ctxItems = Array.Empty<ContextMenu.Item>();
+
+    private ProjectNode? _renameNode;
+    private string _renameValue = "";
+    private bool _showRename;
+    private string? _showInfo;
+    private bool _showExitConfirm;
+
+    protected override async Task OnInitializedAsync()
+    {
+        Theme.OnChange += OnChanged;
+        State.OnChange += OnChanged;
+        await Theme.InitialiseAsync();
+        await RefreshProjectsAsync();
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+    private void ToggleSidebar() => _sidebarCollapsed = !_sidebarCollapsed;
+    private async Task ToggleTheme() => await Theme.ToggleAsync();
+
+    private async Task RefreshProjectsAsync()
+    {
+        _projects = await Repo.ListProjectsAsync();
+        State.NotifyChanged();
+        StateHasChanged();
+    }
+
+    private Task OpenProject()
+    {
+        _sidebarCollapsed = false;
+        Nav.NavigateTo("/");
+        return Task.CompletedTask;
+    }
+
+    private Task GoHome() { Nav.NavigateTo("/"); return Task.CompletedTask; }
+    private Task GoImport()
+    {
+        State.ClearImportState();
+        Nav.NavigateTo("/import");
+        return Task.CompletedTask;
+    }
+    private Task GoSelectInputs() { Nav.NavigateTo("/select-inputs"); return Task.CompletedTask; }
+    private Task GoModelParameters() { Nav.NavigateTo("/model-parameters"); return Task.CompletedTask; }
+    private Task GoSimulationSetup() { Nav.NavigateTo("/simulation-setup"); return Task.CompletedTask; }
+    private Task GoFieldPressureFalloff() { Nav.NavigateTo("/field-pressure-falloff"); return Task.CompletedTask; }
+    private Task GoShutInCurves() { Nav.NavigateTo("/shut-in-curves"); return Task.CompletedTask; }
+    private Task GoBoundCurves() { Nav.NavigateTo("/bound-curves"); return Task.CompletedTask; }
+    private Task GoUserGuessMatch() { Nav.NavigateTo("/user-guess-match"); return Task.CompletedTask; }
+    private Task GoAutoRunSolutions() { Nav.NavigateTo("/auto-run-solutions"); return Task.CompletedTask; }
+    private Task GoLoadHistory() { Nav.NavigateTo("/best-history"); return Task.CompletedTask; }
+
+    private Task OpenSaveDialog() { _saveDialogSaveAsMode = false; _showSaveDialog = true; return Task.CompletedTask; }
+    private Task OpenSaveAsDialog() { _saveDialogSaveAsMode = true; _showSaveDialog = true; return Task.CompletedTask; }
+
+    private Task CloseSaveDialog()
+    {
+        _showSaveDialog = false;
+        _saveDialogSaveAsMode = false;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    // ------------------------------------------------------------------
+    // Ribbon Export — shows "Exporting…" and disables button while running.
+    // ------------------------------------------------------------------
+    private async Task ExportAsync()
+    {
+        if (_ribbonExportBusy) return;
+        _ribbonExportBusy = true;
+        StateHasChanged();
+
+        try
+        {
+            await Task.Yield();
+
+            var sheets = ExportBuilder.Build(State.Case);
+            var bytes = Excel.CreateWorkbook(sheets);
+
+            await JS.InvokeVoidAsync("atipt.downloadFile",
+                "ATIPT_Export.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                bytes);
+        }
+        finally
+        {
+            _ribbonExportBusy = false;
+            StateHasChanged();
+        }
+    }
+
+    private Task OpenExitDialog() { _showExitConfirm = true; return Task.CompletedTask; }
+
+    private async Task OnExitConfirmResult(bool yes)
+    {
+        _showExitConfirm = false;
+        StateHasChanged();
+
+        if (!yes) return;
+
+        try { State.SolverCts?.Cancel(); } catch { }
+        try { await Runner.KillAllAsync(); } catch { }
+
+        try
+        {
+            await JS.InvokeVoidAsync("eval",
+                "try { window.open('', '_self', ''); window.close(); } catch(e) {}");
+        }
+        catch { }
+
+        await Task.Delay(150);
+        Environment.Exit(0);
+    }
+
+    private async Task StopAsync()
+    {
+        try { State.SolverCts?.Cancel(); } catch { }
+        await Runner.KillAllAsync();
+        State.SetBusy(null);
+        State.NotifyChanged();
+    }
+
+    private async Task OpenProjectAsync(ProjectNode node)
+    {
+        if (string.IsNullOrEmpty(node.Tag)) return;
+        if (node.Tag is "Inputs" or "Solutions") return;
+
+        string? caseFolder = null;
+        string? projectName = null;
+
+        if (node.Tag.Length > 0 && char.IsDigit(node.Tag[0]))
+        {
+            var root = FindRoot(node);
+            if (root is not null)
+            {
+                var rootPath = root.Tag.TrimEnd('\\', '0').TrimEnd('\\');
+                caseFolder = Path.Combine(rootPath, node.Tag);
+                projectName = root.Name;
+            }
+        }
+        else
+        {
+            var rootPath = node.Tag.TrimEnd('\\', '0').TrimEnd('\\');
+            caseFolder = Path.Combine(rootPath, "0");
+            projectName = node.Name;
+        }
+
+        if (string.IsNullOrEmpty(caseFolder) || !Directory.Exists(caseFolder)) return;
+
+        State.SetBusy("Loading project ...");
+        try
+        {
+            State.CurrentProjectName = projectName;
+            State.CurrentProjectFolder = caseFolder;
+
+            var loaded = await Repo.LoadCaseAsync(caseFolder);
+
+            if (loaded is not null)
+            {
+                State.ResetCase();
+                State.Case.CopyFrom(loaded);
+                State.ApplyEnablementFromLoadedCase();
+            }
+            else
+            {
+                State.ResetCase();
+            }
+
+            State.NotifyChanged();
+        }
+        finally
+        {
+            State.SetBusy(null);
+            StateHasChanged();
+        }
+
+        Nav.NavigateTo("/import");
+    }
+
+    private static ProjectNode? FindRoot(ProjectNode n)
+    {
+        var current = n;
+        while (current.Parent is not null) current = current.Parent;
+        return current;
+    }
+
+    private Task ShowContextMenu(ProjectNode node, double x, double y)
+    {
+        _ctxNode = node;
+        _ctxX = x;
+        _ctxY = y;
+
+        var items = new List<ContextMenu.Item>();
+        if (_ctxNode.Parent is null)
+            items.Add(new("Delete", DeleteNodeAsync));
+        items.Add(new("Rename", RenameNodeAsync));
+        items.Add(new("Show", ShowNodeAsync));
+
+        _ctxItems = items;
+        _ctxVisible = true;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private async Task DeleteNodeAsync()
+    {
+        _ctxVisible = false;
+        StateHasChanged();
+        if (_ctxNode is null) return;
+        await Repo.DeleteProjectAsync(_ctxNode.Name);
+        await RefreshProjectsAsync();
+    }
+
+    private Task RenameNodeAsync()
+    {
+        _ctxVisible = false;
+        if (_ctxNode is null) { StateHasChanged(); return Task.CompletedTask; }
+        _renameNode = _ctxNode;
+        _renameValue = _ctxNode.Name;
+        _showRename = true;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private Task ShowNodeAsync()
+    {
+        _ctxVisible = false;
+        if (_ctxNode is null) { StateHasChanged(); return Task.CompletedTask; }
+        _showInfo = $"Name: {_ctxNode.Name}\nTag: {_ctxNode.Tag}";
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private Task CloseContextMenu()
+    {
+        _ctxVisible = false;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private Task OnRenameValueChanged(string v)
+    {
+        _renameValue = v;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private async Task ConfirmRenameAsync()
+    {
+        _showRename = false;
+        StateHasChanged();
+        if (_renameNode is null || string.IsNullOrWhiteSpace(_renameValue)) return;
+        if (_renameNode.Parent is null)
+            await Repo.RenameProjectAsync(_renameNode.Name, _renameValue.Trim());
+        await RefreshProjectsAsync();
+    }
+
+    private Task CloseRename()
+    {
+        _showRename = false;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private Task CloseInfo()
+    {
+        _showInfo = null;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    public void Dispose()
+    {
+        Theme.OnChange -= OnChanged;
+        State.OnChange -= OnChanged;
+    }
+}

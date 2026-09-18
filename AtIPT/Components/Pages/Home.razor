@@ -1,0 +1,38 @@
+﻿@page "/"
+@inject AppState State
+
+<PageTitle>ATIPT</PageTitle>
+
+<div class="welcome-hero">
+    <img src="logo.png" class="hero-logo" alt="Company Logo" />
+    <h2>Welcome to ATIPT Platform</h2>
+    <p>Advanced Transient Isothermal Pressure Testing</p>
+</div>
+
+<div class="quick-start">
+    <h3>🚀 Quick Start Workflow</h3>
+
+    <div class="step">
+        <div class="step-num blue">1</div>
+        <div class="step-body">
+            <strong>Import Data File</strong>
+            <span>Click Import in the ribbon to load raw time-pressure data.</span>
+        </div>
+    </div>
+
+    <div class="step">
+        <div class="step-num green">2</div>
+        <div class="step-body">
+            <strong>Setup Parameters</strong>
+            <span>Configure boundary limits and model parameters in Analysis tab.</span>
+        </div>
+    </div>
+
+    <div class="step">
+        <div class="step-num red">3</div>
+        <div class="step-body">
+            <strong>Execute &amp; Plot</strong>
+            <span>Run Fortran solver binaries and render falloff charts.</span>
+        </div>
+    </div>
+</div>

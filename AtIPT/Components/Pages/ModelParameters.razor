@@ -1,0 +1,379 @@
+﻿@page "/model-parameters"
+@inject AppState State
+@inject NavigationManager Nav
+@inject ISolverFileService Files
+@inject IParameterFileService Params
+@inject IJSRuntime JS
+@using AtIPT.Components.Shared
+
+<PageTitle>Model Parameters</PageTitle>
+
+<div class="params-page">
+
+    <PageHeader Title="Model Parameters"
+                Subtitle="Operational, Formation, Initial Estimated and Other Simulation Parameters." />
+
+    <div class="tabs">
+        @foreach (var t in _tabs)
+        {
+            <button class="tab @(_active == t ? "active" : "")"
+                    @onclick="() => _active = t">
+                @t
+            </button>
+        }
+    </div>
+
+    @if (_active == "Operational Parameters")
+    {
+        <AppCard>
+            <table class="grid">
+                <thead>
+                    <tr>
+                        <th>Parameter Name (Unit)</th>
+                        <th>Value</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (int i = 0; i < 9; i++)
+                    {
+                        var idx = i;
+                        var p = State.Case.Parameters[idx];
+                        <tr>
+                            <td>@p.Name @(string.IsNullOrEmpty(p.Unit) ? "" : $"({p.Unit})")</td>
+                            <td><input class="input" type="number" step="any" @bind="p.Value" /></td>
+                            <td>
+                                @if (idx == 0)
+                                {
+                                    <button class="btn" @onclick="() => PickShutIn()">Set from curve</button>
+                                }
+                                else if (idx == 2)
+                                {
+                                    <button class="btn" @onclick="() => PickEndPoint()">Set from curve</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </AppCard>
+    }
+    else if (_active == "Formation Parameters")
+    {
+        <AppCard>
+            <table class="grid">
+                <thead>
+                    <tr><th>Parameter Name (Unit)</th><th>Value</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @for (int i = 9; i < 17; i++)
+                    {
+                        var idx = i;
+                        var p = State.Case.Parameters[idx];
+                        <tr>
+                            <td>@p.Name @(string.IsNullOrEmpty(p.Unit) ? "" : $"({p.Unit})")</td>
+                            <td><input class="input" type="number" step="any" @bind="p.Value" /></td>
+                            <td>
+                                @if (idx == 14)
+                                {
+                                    <button class="btn" @onclick="() => CalcTotalCompressibility()">Calc</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </AppCard>
+    }
+    else if (_active == "Initial Estimated Parameters")
+    {
+        <AppCard>
+            <table class="grid">
+                <thead>
+                    <tr><th>Parameter Name (Unit)</th><th>Value</th><th></th></tr>
+                </thead>
+                <tbody>
+                    @for (int i = 18; i < 25; i++)
+                    {
+                        var idx = i;
+                        var p = State.Case.Parameters[idx];
+                        <tr>
+                            <td>@p.Name @(string.IsNullOrEmpty(p.Unit) ? "" : $"({p.Unit})")</td>
+                            <td><input class="input" type="number" step="any" @bind="p.Value" /></td>
+                            <td>
+                                @if (idx == 21)
+                                {
+                                    <button class="btn" @onclick="() => PickFsc()">Set from curve</button>
+                                }
+                                else if (idx == 18)
+                                {
+                                    <button class="btn" @onclick="() => PickPermeability()">Set from curve</button>
+                                }
+                                else if (idx == 19)
+                                {
+                                    <button class="btn" @onclick="() => PickMobility()">Set from curve</button>
+                                }
+                                else if (idx == 24)
+                                {
+                                    <button class="btn" @onclick="() => CalcMobilityFront()">calc</button>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </AppCard>
+    }
+    else
+    {
+        <AppCard>
+            <table class="grid">
+                <thead>
+                    <tr><th>Parameter Name (Unit)</th><th>Value</th></tr>
+                </thead>
+                <tbody>
+                    @for (int i = 27; i < 32; i++)
+                    {
+                        var p = State.Case.Parameters[i];
+                        <tr>
+                            <td>@p.Name @(string.IsNullOrEmpty(p.Unit) ? "" : $"({p.Unit})")</td>
+                            <td><input class="input" type="number" step="any" @bind="p.Value" /></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </AppCard>
+    }
+
+    @if (!string.IsNullOrEmpty(_status))
+    {
+        <div class="muted" style="margin-top:6px;">@_status</div>
+    }
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="error">@_error</div>
+    }
+
+    <InputFile OnChange="OnParameterFileSelected"
+               id="paramFileInput"
+               accept=".txt,.dat,.csv"
+               style="display:none" />
+
+    <div class="action-row">
+        <div class="action-left">
+            <button class="btn" @onclick="() => Cancel()">Cancel</button>
+        </div>
+        <div class="action-right">
+            <button class="btn" @onclick="() => TriggerSetFromFile()">Set From File</button>
+            <button class="btn" @onclick="() => SaveToFileAsync()">Save in File</button>
+            <button class="btn primary"
+                    disabled="@_doneBusy"
+                    @onclick="() => DoneAsync()">
+                @(_doneBusy ? "Processing…" : "Done")
+            </button>
+        </div>
+    </div>
+
+</div>
+
+<FractureHalfLengthDialog Visible="_showFhl"
+                          Fsc="State.Case.Parameters[21].Value"
+                          PoissonRatio="State.Case.Parameters[12].Value"
+                          YoungModulus="State.Case.Parameters[13].Value"
+                          Thickness="State.Case.Parameters[9].Value"
+                          Picked="OnFhlPicked"
+                          Cancel="CloseFhl" />
+
+@code {
+    private readonly string[] _tabs =
+    {
+        "Operational Parameters",
+        "Formation Parameters",
+        "Initial Estimated Parameters",
+        "Other Simulation Parameters"
+    };
+
+    private string _active = "Operational Parameters";
+    private string? _error;
+    private string? _status;
+    private bool _showFhl;
+    private bool _doneBusy;
+
+    private Task TriggerSetFromFile()
+        => JS.InvokeVoidAsync("atipt.clickElement", "paramFileInput").AsTask();
+
+    private async Task OnParameterFileSelected(InputFileChangeEventArgs e)
+    {
+        _status = null;
+        _error = null;
+
+        var file = e.File;
+        if (file is null) return;
+
+        try
+        {
+            await using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            var values = await Params.ReadAsync(stream);
+
+            if (values.Count == 0)
+            {
+                _status = "The selected file did not contain any recognised parameter lines.";
+                StateHasChanged();
+                return;
+            }
+
+            foreach (var kv in values)
+            {
+                if (kv.Key >= 0 && kv.Key < State.Case.Parameters.Count)
+                    State.Case.Parameters[kv.Key].Value = kv.Value;
+            }
+
+            _status = $"Loaded {values.Count} parameter(s) from {file.Name}.";
+            State.NotifyChanged();
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to read parameter file: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+
+    private async Task SaveToFileAsync()
+    {
+        _status = null;
+        _error = null;
+
+        try
+        {
+            var text = Params.Write(State.Case);
+            var bytes = System.Text.Encoding.UTF8.GetBytes(text);
+
+            await JS.InvokeVoidAsync("atipt.downloadFile",
+                "ModelParameters.txt",
+                "text/plain;charset=utf-8",
+                bytes);
+
+            _status = "Parameter file downloaded.";
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            _error = $"Failed to save parameter file: {ex.Message}";
+            StateHasChanged();
+        }
+    }
+
+    private void PickShutIn() { State.BeginPick(PickTarget.ShutInPoint); Nav.NavigateTo("/field-pressure-falloff"); }
+    private void PickEndPoint() { State.BeginPick(PickTarget.EndPoint); Nav.NavigateTo("/field-pressure-falloff"); }
+    private void PickFsc() { State.BeginPick(PickTarget.FscFirstPoint); Nav.NavigateTo("/shut-in-curves"); }
+    private void PickPermeability() { State.BeginPick(PickTarget.PermeabilityPoint); Nav.NavigateTo("/shut-in-curves"); }
+    private void PickMobility() { State.BeginPick(PickTarget.MobilityPoint); Nav.NavigateTo("/shut-in-curves"); }
+
+    private void CalcTotalCompressibility()
+    {
+        double fc = State.Case.Parameters[5].Value;
+        double pr = State.Case.Parameters[12].Value;
+        double poros = State.Case.Parameters[10].Value;
+        double ym = State.Case.Parameters[13].Value;
+
+        if (poros != 0 && ym != 0)
+        {
+            double value = fc + 3 * ((1 - 2 * pr) / (poros * ym));
+            State.Case.Parameters[14].Value = Math.Round(value, 9);
+        }
+    }
+
+    private void CalcMobilityFront()
+    {
+        double volInjected = State.Case.Parameters[8].Value;
+        double fhl = State.Case.Parameters[23].Value;
+        double thick = State.Case.Parameters[9].Value;
+        double poros = State.Case.Parameters[10].Value;
+        double ro = State.Case.Parameters[15].Value;
+        double rw = State.Case.Parameters[16].Value;
+
+        double denom = Math.PI * fhl * fhl * thick * poros * (1 - ro - rw) * 0.1781076;
+        if (denom != 0)
+        {
+            double arg = volInjected * 2 / denom;
+            double fluConPos = Math.Log(arg + Math.Sqrt(arg * arg + 1)) / 2;
+            State.Case.Parameters[24].Value = Math.Round(fluConPos, 4);
+        }
+    }
+
+    private Task CloseFhl()
+    {
+        _showFhl = false;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private Task OnFhlPicked(double value)
+    {
+        State.Case.Parameters[23].Value = value;
+        _showFhl = false;
+        State.NotifyChanged();
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private async Task DoneAsync()
+    {
+        if (_doneBusy) return;
+        _doneBusy = true;
+        StateHasChanged();
+
+        _error = null;
+        _status = null;
+
+        try
+        {
+            if (State.Case.Parameters[17].Value <= 0)
+            {
+                _error = "Value for Plotting LevelSkip must be greater than Zero ";
+                return;
+            }
+
+            double shutIn = State.Case.Parameters[1].Value;
+            double inj = State.Case.Parameters[30].Value;
+            double cont = State.Case.Parameters[31].Value;
+            if (!(inj < shutIn && shutIn < cont))
+            {
+                _error = "Shut in pressure MUST be between injection layer stress and Containment Layer Stress";
+                return;
+            }
+
+            if (State.Case.RawVariables.Count >= 3)
+            {
+                State.Case.DataDifferNew();
+            }
+
+            await Files.WriteModelParametersAsync(State.Case);
+            await Files.WriteRawDataAsync(State.Case);
+            await Files.WriteUnitSystemAsync(false);
+
+            State.ApplyAnalysisParameterDefaults();
+
+            State.EnableAfterModelParameters();
+            State.NotifyChanged();
+
+            Nav.NavigateTo("/simulation-setup");
+        }
+        catch (Exception ex)
+        {
+            _error = $"Error: {ex.Message}";
+        }
+        finally
+        {
+            _doneBusy = false;
+            StateHasChanged();
+        }
+    }
+
+    private void Cancel()
+    {
+        Nav.NavigateTo("/select-inputs");
+    }
+}

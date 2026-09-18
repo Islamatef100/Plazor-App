@@ -1,0 +1,22 @@
+﻿@if (Visible)
+{
+    <div class="overlay">
+        <div class="overlay-panel dialog">
+            <div class="dialog-title">@Title</div>
+            <div class="dialog-body">@Message</div>
+            <div class="dialog-actions">
+                <button class="btn" @onclick="() => OnButton(false)">Cancel</button>
+                <button class="btn primary" @onclick="() => OnButton(true)">OK</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public string Title { get; set; } = "Confirm";
+    [Parameter] public string Message { get; set; } = "";
+    [Parameter] public Func<bool, Task> Result { get; set; } = _ => Task.CompletedTask;
+
+    private Task OnButton(bool value) => Result(value);
+}

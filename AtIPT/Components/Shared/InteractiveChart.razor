@@ -1,0 +1,379 @@
+﻿@using System.Globalization
+@inject IJSRuntime JS
+
+<div class="interactive-chart">
+    <div class="chart-toolbar">
+        @if (ShowRangeButton)
+        {
+            <button class="btn" @onclick="() => OpenRangeClick()">Set Axis Ranges</button>
+        }
+        @if (ShowExportButton)
+        {
+            <button class="btn" disabled="@ExportBusy" @onclick="() => DoExport()">
+                @(ExportBusy ? "Exporting…" : "Export To Excel")
+            </button>
+        }
+        @if (PickMode)
+        {
+            <span class="pick-hint">Hover to preview, then <strong>click</strong> to select.</span>
+        }
+    </div>
+
+    @if (HasData())
+    {
+        @if (!string.IsNullOrEmpty(Title))
+        {
+            <div class="chart-main-title">@Title</div>
+        }
+
+        <div class="chart-body">
+            <div class="chart-y-title">@YTitle</div>
+            <div class="chart-svg-wrap">
+                <div class="chart-container">
+                    <svg @ref="_svg"
+                         viewBox="0 0 @W @H"
+                         preserveAspectRatio="none"
+                         @onmousemove="OnMouseMove"
+                         @onmouseleave="OnMouseLeave"
+                         @onclick="OnClick">
+
+                        <rect x="@Pad" y="@Pad"
+                              width="@(W - 2 * Pad)" height="@(H - 2 * Pad)"
+                              fill="none" stroke="var(--border)" stroke-width="1" />
+
+                        @foreach (var entry in VisibleSeries())
+                        {
+                            if (!entry.Series.PointOnly)
+                            {
+                                <path d="@BuildPath(entry.Series)"
+                                      fill="none"
+                                      stroke="@entry.Series.Color"
+                                      stroke-width="2"
+                                      stroke-linejoin="round"
+                                      stroke-linecap="round" />
+                            }
+
+                            if (entry.Series.PointMarkers)
+                            {
+                                foreach (var (mx, my) in BuildMarkers(entry.Series))
+                                {
+                                    <circle cx="@mx.ToString("F2", CultureInfo.InvariantCulture)"
+                                            cy="@my.ToString("F2", CultureInfo.InvariantCulture)"
+                                            r="2.5" fill="@entry.Series.Color" />
+                                }
+                            }
+                        }
+
+                        @if (_cx.HasValue)
+                        {
+                            <line x1="@_cx" y1="@Pad" x2="@_cx" y2="@(H - Pad)"
+                                  stroke="var(--text-muted)" stroke-dasharray="3,3" stroke-width="1" />
+                            <line x1="@Pad" y1="@_cy" x2="@(W - Pad)" y2="@_cy"
+                                  stroke="var(--text-muted)" stroke-dasharray="3,3" stroke-width="1" />
+                        }
+                    </svg>
+
+                    @if (_hoverX.HasValue && _hoverSeriesName is not null)
+                    {
+                        <div class="chart-tooltip"
+                             style="left:@(_cx)px; top:@(_cy)px;">
+                            @_hoverSeriesName<br />
+                            Time (hr) : @_hoverX.Value.ToString("F4", CultureInfo.InvariantCulture)<br />
+                            @_hoverTooltipLabel: @_hoverY.Value.ToString("F4", CultureInfo.InvariantCulture)
+                        </div>
+                    }
+                </div>
+                <div class="chart-x-title">@XTitle</div>
+            </div>
+        </div>
+    }
+    else
+    {
+        <p class="muted" style="padding:20px; text-align:center;">No chart data.</p>
+    }
+
+    @if (Series.Count > 1)
+    {
+        <div class="chart-legend">
+            @foreach (var s in Series)
+            {
+                <span class="legend-item">
+                    <span class="legend-swatch" style="background:@s.Color;"></span>
+                    @s.Name
+                </span>
+            }
+        </div>
+    }
+
+    @if (Series.Count > 1 && ShowSeriesToggles)
+    {
+        <div class="series-toggles">
+            @for (int i = 0; i < Series.Count; i++)
+            {
+                var idx = i;
+                <label class="chk">
+                    <input type="checkbox"
+                           checked="@_visible[idx]"
+                           @onchange="e => Toggle(idx, e)" />
+                    @Series[idx].Name
+                </label>
+            }
+        </div>
+    }
+
+    <RangeSetterDialog Visible="_showRange"
+                       XMin="_xMin"
+                       XMax="_xMax"
+                       YMin="_yMin"
+                       YMax="_yMax"
+                       Apply="ApplyRange"
+                       Cancel="CloseRange" />
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<ChartSeries> Series { get; set; } = Array.Empty<ChartSeries>();
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public string XTitle { get; set; } = "";
+    [Parameter] public string YTitle { get; set; } = "";
+    [Parameter] public bool LogX { get; set; }
+    [Parameter] public bool LogY { get; set; }
+    [Parameter] public bool ShowRangeButton { get; set; } = true;
+    [Parameter] public bool ShowExportButton { get; set; }
+    [Parameter] public bool ShowSeriesToggles { get; set; } = true;
+    [Parameter] public bool PickMode { get; set; }
+    [Parameter] public bool ExportBusy { get; set; }
+    [Parameter] public Func<double, double, Task>? Picked { get; set; }
+    [Parameter] public Func<Task>? ExportRequested { get; set; }
+
+    private const double W = 900;
+    private const double H = 350;
+    private const double Pad = 40;
+
+    private ElementReference _svg;
+    private List<bool> _visible = new();
+    private bool _showRange;
+
+    private double _xMin = 0.001, _xMax = 1000, _yMin = 0.01, _yMax = 10000;
+
+    private double? _cx;
+    private double? _cy;
+    private double? _hoverX;
+    private double? _hoverY;
+    private string? _hoverSeriesName;
+    private string? _hoverTooltipLabel;
+
+    protected override void OnParametersSet()
+    {
+        if (_visible.Count != Series.Count)
+            _visible = Series.Select(s => s.Visible).ToList();
+    }
+
+    private bool HasData() => Series.Any(s => s.X.Count > 0 && s.Y.Count > 0);
+
+    private IEnumerable<(int Index, ChartSeries Series)> VisibleSeries()
+    {
+        for (int i = 0; i < Series.Count; i++)
+        {
+            if (i < _visible.Count && _visible[i])
+                yield return (i, Series[i]);
+        }
+    }
+
+    private double ToPxX(double x)
+    {
+        if (LogX)
+        {
+            double lx = Math.Log10(Math.Max(x, 1e-12));
+            double lmin = Math.Log10(Math.Max(_xMin, 1e-12));
+            double lmax = Math.Log10(Math.Max(_xMax, 1e-12));
+            if (lmax == lmin) return Pad;
+            return Pad + (lx - lmin) / (lmax - lmin) * (W - 2 * Pad);
+        }
+        if (_xMax == _xMin) return Pad;
+        return Pad + (x - _xMin) / (_xMax - _xMin) * (W - 2 * Pad);
+    }
+
+    private double ToPxY(double y)
+    {
+        if (LogY)
+        {
+            double ly = Math.Log10(Math.Max(y, 1e-12));
+            double lmin = Math.Log10(Math.Max(_yMin, 1e-12));
+            double lmax = Math.Log10(Math.Max(_yMax, 1e-12));
+            if (lmax == lmin) return H - Pad;
+            return H - Pad - (ly - lmin) / (lmax - lmin) * (H - 2 * Pad);
+        }
+        if (_yMax == _yMin) return H - Pad;
+        return H - Pad - (y - _yMin) / (_yMax - _yMin) * (H - 2 * Pad);
+    }
+
+    private double FromPxX(double px)
+    {
+        double t = (px - Pad) / (W - 2 * Pad);
+        if (LogX)
+        {
+            double lmin = Math.Log10(Math.Max(_xMin, 1e-12));
+            double lmax = Math.Log10(Math.Max(_xMax, 1e-12));
+            return Math.Pow(10, lmin + t * (lmax - lmin));
+        }
+        return _xMin + t * (_xMax - _xMin);
+    }
+
+    private double FromPxY(double py)
+    {
+        double t = (H - Pad - py) / (H - 2 * Pad);
+        if (LogY)
+        {
+            double lmin = Math.Log10(Math.Max(_yMin, 1e-12));
+            double lmax = Math.Log10(Math.Max(_yMax, 1e-12));
+            return Math.Pow(10, lmin + t * (lmax - lmin));
+        }
+        return _yMin + t * (_yMax - _yMin);
+    }
+
+    private string BuildPath(ChartSeries sr)
+    {
+        if (sr.X.Count == 0 || sr.Y.Count == 0) return string.Empty;
+        var sb = new System.Text.StringBuilder();
+        int n = Math.Min(sr.X.Count, sr.Y.Count);
+        bool started = false;
+        for (int i = 0; i < n; i++)
+        {
+            if (LogX && sr.X[i] <= 0) continue;
+            if (LogY && sr.Y[i] <= 0) continue;
+            double px = ToPxX(sr.X[i]), py = ToPxY(sr.Y[i]);
+            sb.Append(started ? 'L' : 'M');
+            sb.Append(px.ToString("F2", CultureInfo.InvariantCulture));
+            sb.Append(' ');
+            sb.Append(py.ToString("F2", CultureInfo.InvariantCulture));
+            sb.Append(' ');
+            started = true;
+        }
+        return sb.ToString();
+    }
+
+    private IEnumerable<(double X, double Y)> BuildMarkers(ChartSeries sr)
+    {
+        int n = Math.Min(sr.X.Count, sr.Y.Count);
+        for (int i = 0; i < n; i++)
+        {
+            if (LogX && sr.X[i] <= 0) continue;
+            if (LogY && sr.Y[i] <= 0) continue;
+            yield return (ToPxX(sr.X[i]), ToPxY(sr.Y[i]));
+        }
+    }
+
+    private void UpdateHoverSeriesName(double x, double y)
+    {
+        string? bestName = null;
+        string? bestLabel = null;
+        double bestDist = double.MaxValue;
+        double logX = Math.Log10(Math.Max(x, 1e-12));
+        double logY = Math.Log10(Math.Max(y, 1e-12));
+
+        foreach (var (_, sr) in VisibleSeries())
+        {
+            int n = Math.Min(sr.X.Count, sr.Y.Count);
+            if (n == 0) continue;
+
+            int step = Math.Max(1, n / 100);
+            int bestIdx = -1;
+            double bestLocalDist = double.MaxValue;
+
+            for (int i = 0; i < n; i += step)
+            {
+                if (LogX && sr.X[i] <= 0) continue;
+                if (LogY && sr.Y[i] <= 0) continue;
+                double dx = Math.Log10(Math.Max(sr.X[i], 1e-12)) - logX;
+                double dy = Math.Log10(Math.Max(sr.Y[i], 1e-12)) - logY;
+                double d = dx * dx + dy * dy;
+                if (d < bestLocalDist) { bestLocalDist = d; bestIdx = i; }
+            }
+
+            if (bestIdx >= 0)
+            {
+                int lo = Math.Max(0, bestIdx - step);
+                int hi = Math.Min(n - 1, bestIdx + step);
+                for (int i = lo; i <= hi; i++)
+                {
+                    if (LogX && sr.X[i] <= 0) continue;
+                    if (LogY && sr.Y[i] <= 0) continue;
+                    double dx = Math.Log10(Math.Max(sr.X[i], 1e-12)) - logX;
+                    double dy = Math.Log10(Math.Max(sr.Y[i], 1e-12)) - logY;
+                    double d = dx * dx + dy * dy;
+                    if (d < bestLocalDist) { bestLocalDist = d; bestIdx = i; }
+                }
+            }
+
+            if (bestLocalDist < bestDist)
+            {
+                bestDist = bestLocalDist;
+                bestName = sr.Name;
+                bestLabel = sr.TooltipLabel;
+            }
+        }
+        _hoverSeriesName = bestName;
+        _hoverTooltipLabel = bestLabel;
+    }
+
+    private async Task OnMouseMove(MouseEventArgs e)
+    {
+        var pt = await JS.InvokeAsync<SvgPoint>("atipt.svgPoint", _svg, e.ClientX, e.ClientY, W, H);
+        double x = FromPxX(pt.X), y = FromPxY(pt.Y);
+
+        if (x < _xMin || x > _xMax || y < _yMin || y > _yMax)
+        {
+            _cx = null; _cy = null; _hoverX = null; _hoverY = null;
+            _hoverSeriesName = null; _hoverTooltipLabel = null;
+            return;
+        }
+        _cx = pt.X; _cy = pt.Y; _hoverX = x; _hoverY = y;
+        UpdateHoverSeriesName(x, y);
+    }
+
+    private void OnMouseLeave()
+    {
+        _cx = null; _cy = null; _hoverX = null; _hoverY = null;
+        _hoverSeriesName = null; _hoverTooltipLabel = null;
+    }
+
+    private async Task OnClick(MouseEventArgs e)
+    {
+        if (!PickMode || Picked is null) return;
+        var pt = await JS.InvokeAsync<SvgPoint>("atipt.svgPoint", _svg, e.ClientX, e.ClientY, W, H);
+        double x = FromPxX(pt.X), y = FromPxY(pt.Y);
+        if (x < _xMin || x > _xMax || y < _yMin || y > _yMax) return;
+        await Picked(x, y);
+    }
+
+    private void Toggle(int idx, ChangeEventArgs e)
+        => _visible[idx] = (bool)(e.Value ?? false);
+
+    private Task OpenRangeClick()
+    {
+        _showRange = true;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private Task CloseRange()
+    {
+        _showRange = false;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private Task ApplyRange(AxisRange r)
+    {
+        _xMin = r.XMin; _xMax = r.XMax;
+        _yMin = r.YMin; _yMax = r.YMax;
+        _showRange = false;
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    private async Task DoExport()
+    {
+        if (ExportRequested is not null) await ExportRequested();
+    }
+}

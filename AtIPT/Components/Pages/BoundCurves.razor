@@ -1,0 +1,90 @@
+﻿@page "/bound-curves"
+@inject AppState State
+@inject IExcelExportService Excel
+@inject IJSRuntime JS
+@using AtIPT.Components.Shared
+@using AtIPT.Application.Services
+
+<PageTitle>Bound Curves</PageTitle>
+
+<PageHeader Title="Bound Curves"
+            Subtitle="Field data versus the upper and lower bound simulations." />
+
+@if (State.Case.DifferenceVariables.Count < 3 || State.Case.InitialGuessMin.Count < 3)
+{
+    <AppCard>
+        <p class="muted">Run “Set Bounds” first.</p>
+    </AppCard>
+}
+else
+{
+    <AppCard>
+        <InteractiveChart Series="BuildSeries()"
+                          XTitle="Shut-in Time (hr)"
+                          YTitle="Pressure / Derivative (psi)"
+                          LogX="true"
+                          LogY="true"
+                          ShowExportButton="true"
+                          ExportRequested="ExportAsync" />
+    </AppCard>
+}
+
+@code {
+    private IReadOnlyList<ChartSeries> BuildSeries()
+    {
+        var d = State.Case.DifferenceVariables;
+        var min = State.Case.InitialGuessMin;
+        var max = State.Case.InitialGuessMax;
+
+        return new[]
+        {
+            new ChartSeries
+            {
+                Name = "Field DeltaP",
+                Color = "#0d6efd",
+                X = d[0].Values, Y = d[1].Values
+            },
+            new ChartSeries
+            {
+                Name = "Field Derivative",
+                Color = "#6ea8fe",
+                X = d[0].Values, Y = d[2].Values, PointMarkers = true
+            },
+            new ChartSeries
+            {
+                Name = "Upper Bound DeltaP",
+                Color = "#198754",
+                X = min[0].Values, Y = min[1].Values
+            },
+            new ChartSeries
+            {
+                Name = "Upper Bound Derivative",
+                Color = "#4caf50",
+                X = min[0].Values, Y = min[2].Values, PointMarkers = true
+            },
+            new ChartSeries
+            {
+                Name = "Lower Bound DeltaP",
+                Color = "#dc3545",
+                X = max[0].Values, Y = max[1].Values
+            },
+            new ChartSeries
+            {
+                Name = "Lower Bound Derivative",
+                Color = "#f08080",
+                X = max[0].Values, Y = max[2].Values, PointMarkers = true
+            }
+        };
+    }
+
+    private async Task ExportAsync()
+    {
+        var sheets = ExportBuilder.Build(State.Case);
+        var bytes  = Excel.CreateWorkbook(sheets);
+
+        await JS.InvokeVoidAsync("atipt.downloadFile",
+            "BoundCurves.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            bytes);
+    }
+}

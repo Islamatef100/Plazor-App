@@ -1,0 +1,110 @@
+﻿@page "/select-inputs"
+@inject AppState State
+@inject NavigationManager Nav
+
+<PageTitle>Select Inputs</PageTitle>
+
+<PageHeader Title="Select Inputs"
+            Subtitle="Map each required input to a column from the imported file." />
+
+<AppCard Title="Input Mapping">
+    <table class="grid">
+        <thead>
+            <tr><th>Variable Name (Unit)</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+            @for (int i = 0; i < Rows.Length; i++)
+            {
+                var idx = i;
+                <tr>
+                    <td>@Rows[idx]</td>
+                    <td>
+                        <select class="input" value="@_selected[idx]"
+                                @onchange="e => OnSelectChanged(idx, e)">
+                            <option value="">— select —</option>
+                            @foreach (var v in State.ImportedVariables)
+                            {
+                                <option value="@v.Name">@v.Name</option>
+                            }
+                        </select>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</AppCard>
+
+<div class="action-row">
+    <div class="action-left">
+        <button class="btn" @onclick="() => Cancel()">Cancel</button>
+    </div>
+    <div class="action-right">
+        <button class="btn primary" @onclick="() => DoneAsync()">Done</button>
+    </div>
+</div>
+
+@code {
+    private static readonly string[] Rows =
+    {
+        "* Bottom Hole Injection Pressure (BHIP)",
+        "* Elapsed Time (ET)",
+        "  Injection Rate (BPD)"
+    };
+
+    private string?[] _selected = new string?[3];
+
+    protected override void OnInitialized()
+    {
+        var names = State.ImportedVariables.Select(v => v.Name).ToList();
+        int ct = names.Count;
+
+        for (int i = 0; i < 3; i++)
+        {
+            int idx = ct - i - 1;
+            _selected[i] = idx >= 0 && idx < ct ? names[idx] : null;
+        }
+    }
+
+    private void OnSelectChanged(int idx, ChangeEventArgs e)
+    {
+        _selected[idx] = e.Value?.ToString();
+    }
+
+    private Task DoneAsync()
+    {
+        var c = State.Case;
+
+        c.RawVariables.Clear();
+        c.OriginalRawData.Clear();
+
+        for (int i = 0; i < 3; i++)
+        {
+            var name = _selected[i];
+            var v = new Variable(name ?? $"Input {i + 1}");
+
+            if (!string.IsNullOrEmpty(name))
+            {
+                var src = State.ImportedVariables.FirstOrDefault(x => x.Name == name);
+                if (src is not null) v.Values.AddRange(src.Values);
+            }
+
+            c.RawVariables.Add(v);
+
+            var original = new Variable(v.Name);
+            original.Values.AddRange(v.Values);
+            c.OriginalRawData.Add(original);
+
+            c.SelectedInputs[i] = name ?? "";
+        }
+
+        c.RawVariablesCount = c.RawVariables[0].Values.Count;
+
+        State.EnableAfterSelectInputs();
+        State.NotifyChanged();
+
+        Nav.NavigateTo("/model-parameters");
+        return Task.CompletedTask;
+    }
+
+    private void Cancel() => _selected = new string?[3];
+}

@@ -1,0 +1,44 @@
+﻿@if (ShowRename)
+{
+    <div class="overlay">
+        <div class="overlay-panel dialog">
+            <div class="dialog-title">Rename</div>
+            <div class="dialog-body">
+                <input class="input" style="width:100%"
+                       value="@RenameValue"
+                       @oninput="OnInput" />
+            </div>
+            <div class="dialog-actions">
+                <button class="btn" @onclick="() => Cancel()">Cancel</button>
+                <button class="btn primary" @onclick="() => Confirm()">OK</button>
+            </div>
+        </div>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(InfoText))
+{
+    <div class="overlay">
+        <div class="overlay-panel dialog">
+            <div class="dialog-title">Show</div>
+            <div class="dialog-body" style="white-space:pre-line;">@InfoText</div>
+            <div class="dialog-actions">
+                <button class="btn primary" @onclick="() => CloseInfo()">OK</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool ShowRename { get; set; }
+    [Parameter] public string RenameValue { get; set; } = "";
+    [Parameter] public Func<string, Task> RenameValueChanged { get; set; } = _ => Task.CompletedTask;
+    [Parameter] public string? InfoText { get; set; }
+
+    [Parameter] public Func<Task> Confirm { get; set; } = () => Task.CompletedTask;
+    [Parameter] public Func<Task> Cancel { get; set; } = () => Task.CompletedTask;
+    [Parameter] public Func<Task> CloseInfo { get; set; } = () => Task.CompletedTask;
+
+    private Task OnInput(ChangeEventArgs e)
+        => RenameValueChanged(e.Value?.ToString() ?? string.Empty);
+}

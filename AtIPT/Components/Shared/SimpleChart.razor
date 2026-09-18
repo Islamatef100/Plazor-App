@@ -1,0 +1,51 @@
+﻿@if (XValues.Count == 0 || YValues.Count == 0)
+{
+    <p class="muted">No data.</p>
+}
+else
+{
+    <div class="chart">
+        <svg viewBox="0 0 @ViewBoxWidth @ViewBoxHeight" preserveAspectRatio="none">
+            @foreach (var path in BuildPaths())
+            {
+                <path d="@path" fill="none" stroke="var(--accent)"
+                      stroke-width="1.5" vector-effect="non-scaling-stroke" />
+            }
+        </svg>
+        <div class="chart-axis-x">@XTitle</div>
+        <div class="chart-axis-y">@YTitle</div>
+    </div>
+}
+
+@code {
+    [Parameter] public IReadOnlyList<double> XValues { get; set; } = Array.Empty<double>();
+    [Parameter] public IReadOnlyList<double> YValues { get; set; } = Array.Empty<double>();
+    [Parameter] public string XTitle { get; set; } = "";
+    [Parameter] public string YTitle { get; set; } = "";
+
+    private const double ViewBoxWidth  = 800;
+    private const double ViewBoxHeight = 400;
+
+    private IEnumerable<string> BuildPaths()
+    {
+        if (XValues.Count != YValues.Count || XValues.Count < 2) yield break;
+
+        double xMin = XValues.Min(), xMax = XValues.Max();
+        double yMin = YValues.Min(), yMax = YValues.Max();
+
+        if (xMax == xMin || yMax == yMin) yield break;
+
+        var sb = new System.Text.StringBuilder();
+        for (int i = 0; i < XValues.Count; i++)
+        {
+            double x = (XValues[i] - xMin) / (xMax - xMin) * ViewBoxWidth;
+            double y = ViewBoxHeight - (YValues[i] - yMin) / (yMax - yMin) * ViewBoxHeight;
+
+            sb.Append(i == 0 ? "M" : "L");
+            sb.Append(x.ToString("F2", CultureInfo.InvariantCulture));
+            sb.Append(' ');
+            sb.Append(y.ToString("F2", CultureInfo.InvariantCulture));
+        }
+        yield return sb.ToString();
+    }
+}

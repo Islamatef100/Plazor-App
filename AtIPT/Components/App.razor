@@ -1,0 +1,65 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+
+    <title>@@IPT</title>
+
+    <link rel="icon" type="image/x-icon" href="icon.ico" />
+    <link rel="shortcut icon" type="image/x-icon" href="icon.ico" />
+
+    <script>
+            (function () {
+                try {
+                    var t = localStorage.getItem('atipt-theme');
+                    if (t === 'Dark') document.documentElement.setAttribute('data-theme', 'dark');
+                } catch (e) { }
+            })();
+
+            // Force the browser tab title to always be AtIPT, regardless of
+            // whatever a page sets via <PageTitle>. Runs every 200 ms.
+            (function () {
+                var TARGET = '@@IPT';
+                function enforceTitle() {
+                    if (document.title !== TARGET) document.title = TARGET;
+                }
+                enforceTitle();
+                setInterval(enforceTitle, 200);
+            })();
+    </script>
+
+    <link rel="stylesheet" href="app.css" />
+    <link rel="stylesheet" href="AtIPT.styles.css" />
+    <HeadOutlet @rendermode="Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer" />
+</head>
+<body>
+    <Routes @rendermode="Microsoft.AspNetCore.Components.Web.RenderMode.InteractiveServer" />
+    <script src="_framework/blazor.web.js"></script>
+    <script>
+            window.atipt = {
+                svgPoint: function (svg, clientX, clientY, vbW, vbH) {
+                    var r = svg.getBoundingClientRect();
+                    return {
+                        x: (clientX - r.left) / r.width * vbW,
+                        y: (clientY - r.top) / r.height * vbH
+                    };
+                },
+                clickElement: function (id) {
+                    var el = document.getElementById(id);
+                    if (el) el.click();
+                },
+                downloadFile: function (fileName, contentType, bytes) {
+                    var blob = new Blob([bytes], { type: contentType });
+                    var url = URL.createObjectURL(blob);
+                    var a = document.createElement('a');
+                    a.href = url;
+                    a.download = fileName;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                }
+            };
+    </script>
+</body>
+</html>

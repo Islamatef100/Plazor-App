@@ -1,0 +1,28 @@
+﻿<div class="grid-wrap">
+    <table class="grid">
+        <thead>
+            <tr>
+                @foreach (var col in Columns)
+                {
+                    <th>@col</th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var row in Rows)
+            {
+                <tr>
+                    @foreach (var cell in row)
+                    {
+                        <td>@cell</td>
+                    }
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<string> Columns { get; set; } = Array.Empty<string>();
+    [Parameter] public IReadOnlyList<string[]> Rows  { get; set; } = Array.Empty<string[]>();
+}

@@ -1,0 +1,8 @@
+Permeability,Rate,Viscosity,porosity,compressibility, Toughness
+50,23040,1,0.24,1.2694E-05,4000
+Thickness, Fracture Half Length
+117,300
+t_shutin,p_shutin,t_end,p_end,t_first
+14.383,934,33.203,456.56,0
+tcl	zetaCfD	CwD	Xw	X0	ak
+0.1927,0,0.60550059,0,0,0.0096,0.5

@@ -1,0 +1,157 @@
+﻿@inject AppState State
+@inject IProjectRepository Repo
+
+@if (Visible)
+{
+    <div class="overlay">
+        <div class="overlay-panel dialog">
+            <div class="dialog-title">
+                @(SaveAsMode ? "Save As" : "New Project & Save Case")
+            </div>
+
+            @if (!SaveAsMode)
+            {
+                <div class="tabs">
+                    <button class="tab @(_tab == 0 ? "active" : "")"
+                            @onclick="() => _tab = 0">New Project</button>
+                    <button class="tab @(_tab == 1 ? "active" : "")"
+                            @onclick="() => _tab = 1">Save Case</button>
+                </div>
+            }
+
+            @if (SaveAsMode || _tab == 0)
+            {
+                <div class="dialog-body">
+                    <label style="display:block; margin-bottom:4px;">Project Name</label>
+                    <input class="input" style="width:100%;"
+                           value="@_newProjectName"
+                           @oninput="OnNewProjectNameInput"
+                           placeholder="Enter a name for the new project" />
+                </div>
+            }
+            else
+            {
+                <div class="dialog-body">
+                    <label style="display:block; margin-bottom:4px;">Select Project</label>
+                    <select class="input" style="width:100%;"
+                            value="@_selectedProjectName"
+                            @onchange="OnSelectedProjectChange">
+                        <option value="">— select —</option>
+                        @foreach (var p in _projects)
+                        {
+                            <option value="@p.Name">@p.Name</option>
+                        }
+                    </select>
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(_error))
+            {
+                <div class="error" style="margin-bottom:12px;">@_error</div>
+            }
+
+            <div class="dialog-actions">
+                <button class="btn" @onclick="() => Close()">Cancel</button>
+                <button class="btn primary" @onclick="() => OkAsync()">
+                    @(SaveAsMode || _tab == 0 ? "Create" : "Save")
+                </button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public bool SaveAsMode { get; set; }
+    [Parameter] public Func<Task> Close { get; set; } = () => Task.CompletedTask;
+    [Parameter] public Func<Task> Saved { get; set; } = () => Task.CompletedTask;
+
+    private int _tab = 0;
+    private string _newProjectName = "";
+    private string _selectedProjectName = "";
+    private string? _error;
+    private IReadOnlyList<ProjectNode> _projects = Array.Empty<ProjectNode>();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Visible) return;
+
+        _error = null;
+
+        // When opening in Save As mode, always land on the New Project tab.
+        if (SaveAsMode)
+        {
+            _tab = 0;
+            if (string.IsNullOrEmpty(_newProjectName) && !string.IsNullOrEmpty(State.CurrentProjectName))
+            {
+                // Pre-fill with the current project's name plus a suffix.
+                _newProjectName = $"{State.CurrentProjectName}_copy";
+            }
+        }
+
+        _projects = await Repo.ListProjectsAsync();
+    }
+
+    private void OnNewProjectNameInput(ChangeEventArgs e)
+    {
+        _newProjectName = e.Value?.ToString() ?? string.Empty;
+    }
+
+    private void OnSelectedProjectChange(ChangeEventArgs e)
+    {
+        _selectedProjectName = e.Value?.ToString() ?? string.Empty;
+    }
+
+    private async Task OkAsync()
+    {
+        _error = null;
+
+        // ---- New Project (also used by Save As) ----
+        if (SaveAsMode || _tab == 0)
+        {
+            if (string.IsNullOrWhiteSpace(_newProjectName))
+            {
+                _error = "Please enter a project name.";
+                return;
+            }
+
+            // Validate uniqueness against existing projects.
+            var existing = await Repo.ListProjectsAsync();
+            var trimmed = _newProjectName.Trim();
+            if (existing.Any(p => p.Name.Equals(trimmed, StringComparison.OrdinalIgnoreCase)))
+            {
+                _error = "A project with this name already exists. Choose a different name.";
+                return;
+            }
+
+            var folder = await Repo.CreateProjectAsync(trimmed);
+            State.CurrentProjectName   = trimmed;
+            State.CurrentProjectFolder = folder;
+
+            await Repo.SaveCaseAsync(folder, State.Case, State.CurrentInputFilePath);
+
+            State.EnableAfterImport();
+            await Saved();
+            await Close();
+            return;
+        }
+
+        // ---- Save Case (existing project) ----
+        if (string.IsNullOrWhiteSpace(_selectedProjectName))
+        {
+            _error = "You Have To Select a Project";
+            return;
+        }
+
+        var caseFolder = await Repo.CreateProjectAsync(
+            _selectedProjectName + "_case_" + DateTime.Now.ToString("yyyyMMddHHmmss"));
+        State.CurrentProjectName   = _selectedProjectName;
+        State.CurrentProjectFolder = caseFolder;
+
+        await Repo.SaveCaseAsync(caseFolder, State.Case, State.CurrentInputFilePath);
+
+        State.EnableAfterImport();
+        await Saved();
+        await Close();
+    }
+}

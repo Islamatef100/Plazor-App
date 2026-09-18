@@ -1,0 +1,108 @@
+﻿@page "/user-guess-match"
+@inject AppState State
+@inject IExcelExportService Excel
+@inject IJSRuntime JS
+@using AtIPT.Components.Shared
+@using AtIPT.Application.Services
+@implements IDisposable
+
+<PageTitle>User Guess Match</PageTitle>
+
+<PageHeader Title="User Guess Match"
+            Subtitle="Field data versus the user-guess simulation." />
+
+@if (!HasResults())
+{
+    <AppCard>
+        <p class="muted">Run "Test Guess" first.</p>
+    </AppCard>
+}
+else
+{
+    <AppCard>
+        <InteractiveChart Series="BuildSeries()"
+                          Title="@ResidualTitle()"
+                          XTitle="Shut-in Time (hr)"
+                          YTitle="Differential Pressure and Derivative (psi)"
+                          LogX="true"
+                          LogY="true"
+                          ShowExportButton="true"
+                          ExportBusy="_exportBusy"
+                          ExportRequested="ExportAsync" />
+    </AppCard>
+}
+
+@code {
+    private bool _exportBusy;
+
+    protected override void OnInitialized()
+    {
+        State.OnChange += OnChanged;
+    }
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    private bool HasResults()
+    {
+        return State.Case.DifferenceVariables.Count >= 3
+            && State.Case.DifferenceVariables[0].Values.Count > 0
+            && State.Case.SimulationResults.Count >= 3
+            && State.Case.SimulationResults[0].Values.Count > 0;
+    }
+
+    private string ResidualTitle()
+    {
+        double fit = State.Case.TestGuessFitness ?? 0;
+        return "Residual Error = " + fit.ToString("0.000000");
+    }
+
+    private IReadOnlyList<ChartSeries> BuildSeries()
+    {
+        var d = State.Case.DifferenceVariables;
+        var s = State.Case.SimulationResults;
+
+        return new[]
+        {
+            new ChartSeries { Name = "Modeled DeltaP", Color = "#0d6efd",
+                X = s[0].Values, Y = s[1].Values, Visible = true, TooltipLabel = "Modeled DeltaP" },
+            new ChartSeries { Name = "Modeled Derivative", Color = "#dc3545",
+                X = s[0].Values, Y = s[2].Values, Visible = true,
+                PointMarkers = true, PointOnly = true, TooltipLabel = "Modeled Dervative" },
+            new ChartSeries { Name = "Field DeltaP", Color = "#198754",
+                X = d[0].Values, Y = d[1].Values, Visible = true, TooltipLabel = "Field DeltaP" },
+            new ChartSeries { Name = "Field Derivative", Color = "#6f42c1",
+                X = d[0].Values, Y = d[2].Values, Visible = true,
+                PointMarkers = true, PointOnly = true, TooltipLabel = "Field Dervative" }
+        };
+    }
+
+    // ------------------------------------------------------------------
+    // Export button — shows "Exporting…" and disables while running.
+    // ------------------------------------------------------------------
+    private async Task ExportAsync()
+    {
+        if (_exportBusy) return;
+        _exportBusy = true;
+        StateHasChanged();
+
+        try
+        {
+            await Task.Yield();
+
+            var sheets = ExportBuilder.BuildUserGuessExport(State.Case);
+            var bytes = Excel.CreateWorkbook(sheets);
+
+            await JS.InvokeVoidAsync("atipt.downloadFile",
+                "UserGuessMatch.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                bytes);
+        }
+        finally
+        {
+            _exportBusy = false;
+            StateHasChanged();
+        }
+    }
+
+    public void Dispose() => State.OnChange -= OnChanged;
+}

@@ -1,0 +1,23 @@
+﻿@if (Visible)
+{
+    <div class="context-menu"
+         style="left:@(X)px; top:@(Y)px;"
+         @onmouseleave="() => Close()">
+        @foreach (var item in Items)
+        {
+            <div class="context-menu-item" @onclick="() => item.OnClick()">
+                @item.Text
+            </div>
+        }
+    </div>
+}
+
+@code {
+    public sealed record Item(string Text, Func<Task> OnClick);
+
+    [Parameter] public bool Visible { get; set; }
+    [Parameter] public double X { get; set; }
+    [Parameter] public double Y { get; set; }
+    [Parameter] public IReadOnlyList<Item> Items { get; set; } = Array.Empty<Item>();
+    [Parameter] public Func<Task> Close { get; set; } = () => Task.CompletedTask;
+}

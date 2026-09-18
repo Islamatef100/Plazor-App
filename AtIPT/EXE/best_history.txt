@@ -1,0 +1,8 @@
+ Iteration,  Fitness, Perm,FHL, Skin, Dimfraccon, wellstrgcon, injlyrstress, cnt
+ lyrstress, deltapat
+ Iteration,  Fitness, Perm,FHL, Skin, Dimfraccon, wellstrgcon, injlyrstress, cnt
+ lyrstress, deltapat
+ Iteration,  Fitness, Perm,FHL, Skin, Dimfraccon, wellstrgcon, injlyrstress, cnt
+ lyrstress, deltapat
+ Iteration,  Fitness, Perm,FHL, Skin, Dimfraccon, wellstrgcon, injlyrstress, cnt
+ lyrstress, deltapat

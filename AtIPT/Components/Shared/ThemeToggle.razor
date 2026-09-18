@@ -1,0 +1,9 @@
+﻿@inject IThemeService Theme
+
+<button class="theme-toggle" @onclick="() => Toggle()" title="Toggle theme">
+    @(Theme.Current == AppTheme.Light ? "🌙 Dark" : "☀️ Light")
+</button>
+
+@code {
+    private Task Toggle() => Theme.ToggleAsync();
+}

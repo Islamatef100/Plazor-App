@@ -1,0 +1,78 @@
+﻿@page "/field-pressure-falloff"
+@inject AppState State
+@inject NavigationManager Nav
+@using AtIPT.Components.Shared
+
+<PageTitle>Field Pressure Falloff</PageTitle>
+
+<PageHeader Title="Field Pressure Falloff"
+            Subtitle="Raw bottom-hole injection pressure versus elapsed time. Click on the chart to set shut-in or end point." />
+
+@if (State.ActivePickTarget is PickTarget.ShutInPoint or PickTarget.EndPoint)
+{
+    <div class="card" style="padding:8px 14px; display:flex; align-items:center; gap:12px;">
+        <span class="pick-hint">Picking: <strong>@State.ActivePickTarget</strong> — click on the chart.</span>
+        <button class="btn" @onclick="() => CancelPick()">Cancel Pick</button>
+    </div>
+}
+
+<AppCard>
+    @if (State.Case.RawVariables.Count >= 2 && State.Case.RawVariables[1].Values.Count > 0)
+    {
+        <InteractiveChart Series="BuildSeries()"
+                          XTitle="Elapsed Time (hr)"
+                          YTitle="Bottom Hole Injection Pressure (psi)"
+                          ShowSeriesToggles="false"
+                          PickMode="@(State.ActivePickTarget is PickTarget.ShutInPoint or PickTarget.EndPoint)"
+                          Picked="OnPicked" />
+    }
+    else
+    {
+        <p class="muted">Load input data first.</p>
+    }
+</AppCard>
+
+@code {
+    private IReadOnlyList<ChartSeries> BuildSeries()
+    {
+        return new[]
+        {
+            new ChartSeries
+            {
+                Name = "Field Pressure",
+                Color = "#0d6efd",
+                X = State.Case.RawVariables[1].Values,
+                Y = State.Case.RawVariables[0].Values,
+                Visible = true
+            }
+        };
+    }
+
+    private Task CancelPick()
+    {
+        State.CancelPick();
+        return Task.CompletedTask;
+    }
+
+    private Task OnPicked(double x, double y)
+    {
+        switch (State.ActivePickTarget)
+        {
+            case PickTarget.ShutInPoint:
+                State.Case.Parameters[0].Value = Math.Round(x, 6);
+                State.Case.Parameters[1].Value = Math.Round(y, 6);
+                break;
+
+            case PickTarget.EndPoint:
+                State.Case.Parameters[2].Value = Math.Round(x, 6);
+                State.Case.Parameters[3].Value = Math.Round(y, 6);
+                break;
+        }
+
+        State.CancelPick();
+        State.NotifyChanged();
+
+        Nav.NavigateTo("/model-parameters");
+        return Task.CompletedTask;
+    }
+}

@@ -1,0 +1,40 @@
+﻿@inject AppState State
+@inject ISimulationRunner Runner
+@implements IDisposable
+
+@if (State.IsBusy)
+{
+    <div class="overlay">
+        <div class="loading-panel">
+            <img src="logo.png" class="loading-logo" alt="ADVANTEK" />
+            <div class="loading-brand">ADVANTEK</div>
+            <div class="loading-sub">ATIPT Web Platform</div>
+
+            <div class="spinner"></div>
+
+            <div class="loading-message">@State.BusyMessage</div>
+
+            <button class="btn" style="margin-top:18px; min-width:120px;"
+                    @onclick="() => StopAsync()">
+                Stop
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    protected override void OnInitialized()
+        => State.OnChange += OnChanged;
+
+    private void OnChanged() => InvokeAsync(StateHasChanged);
+
+    private async Task StopAsync()
+    {
+        try { State.SolverCts?.Cancel(); } catch { }
+        try { await Runner.KillAllAsync(); } catch { }
+        State.SetBusy(null);
+        State.NotifyChanged();
+    }
+
+    public void Dispose() => State.OnChange -= OnChanged;
+}
